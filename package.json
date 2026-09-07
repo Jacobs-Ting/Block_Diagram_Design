@@ -1,0 +1,12 @@
+{
+  "name": "stratum-system-planner",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs"
+  },
+  "description": "Zero-runtime-dependency engineering graph editor; npm is only needed for development tests.",
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  }
+}
