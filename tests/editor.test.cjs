@@ -286,3 +286,27 @@ test('JSON and PNG exports produce downloads; PNG scales very large workspaces s
   const canvas=d.querySelector('canvas');assert.equal(canvas,null);
   E.clean();
 });
+
+test('Theme toggle persists in project state and block typography renders immediately',()=>{
+  const E=editor(),{P,d,svg,pointer,input,field}=E;
+  assert.equal(d.documentElement.dataset.theme,'dark');d.querySelector('#theme-toggle').click();assert.equal(P.state.appearance.theme,'light');assert.equal(d.documentElement.dataset.theme,'light');assert.match(d.querySelector('#theme-toggle').textContent,/深色/);
+  const cpu=P.state.components.find(c=>c.type==='CPU'),node=d.querySelector(`[data-id="${cpu.id}"]`);pointer(node.querySelector('.body'),'pointerdown',cpu.x+10,cpu.y+10);pointer(svg,'pointerup');
+  input(field('Font'),'Consolas');input(field('Font Size'),'22');input(field('Text Color'),'#cc3366');
+  assert.equal(cpu.fontFamily,'Consolas');assert.equal(cpu.fontSize,22);assert.equal(cpu.textColor,'#cc3366');assert.equal(node.querySelector('.name').style.fontFamily,'Consolas');assert.equal(node.querySelector('.name').style.fontSize,'22px');assert.match(node.querySelector('.name').style.fill,/204, 51, 102/);
+  const exported=P.buildExportSvg();assert.match(exported,/fill="#f4f7fa"/);P.saveProject();d.querySelector('#theme-toggle').click();P.loadSavedProject();assert.equal(d.documentElement.dataset.theme,'light');E.clean();
+});
+
+test('Text boxes create, edit, move, resize, copy, save and clear as first-class objects',()=>{
+  const E=editor(),{P,d,svg,pointer,input,field,key}=E;P.clearCanvas();d.querySelector('#text-mode').click();assert.equal(P.ui.mode,'text');
+  pointer(svg,'pointerdown',100,120);pointer(svg,'pointermove',380,260);pointer(svg,'pointerup',380,260);assert.equal(P.state.textBoxes.length,1);assert.equal(P.ui.selectedKind,'text');assert.equal(P.ui.mode,'select');
+  const box=P.state.textBoxes[0],node=d.querySelector(`[data-text-id="${box.id}"]`);assert.ok(node);assert.equal(node.querySelectorAll('.text-resize-handle').length,8);
+  input(field('Text'),'RF signal chain\nPrototype annotation');input(field('Font'),'Georgia');input(field('Font Size'),'24');input(field('Text Color'),'#112233');input(field('Background Color'),'#ddeeff');input(field('Border Color'),'#445566');
+  assert.equal(box.text,'RF signal chain\nPrototype annotation');assert.equal(box.fontFamily,'Georgia');assert.equal(box.fontSize,24);assert.match(node.querySelector('.text-box-content').textContent,/Prototypeannotation/);assert.match(node.querySelector('.text-box-body').style.fill,/221, 238, 255/);
+  pointer(node.querySelector('.text-box-body'),'pointerdown',120,140);pointer(svg,'pointermove',180,200);pointer(svg,'pointerup',180,200);assert.equal(box.x,160);assert.equal(box.y,180);
+  pointer(node.querySelector('[data-text-handle="se"]'),'pointerdown',440,320);pointer(svg,'pointermove',520,380);pointer(svg,'pointerup',520,380);assert.equal(box.width,360);assert.equal(box.height,200);
+  key(svg,'c',{ctrlKey:true});key(svg,'v',{ctrlKey:true});assert.equal(P.state.textBoxes.length,2);assert.equal(P.ui.selectedKind,'text');assert.notEqual(P.ui.selected,box.id);
+  P.saveProject();P.clearCanvas();assert.equal(d.querySelectorAll('.text-box').length,0);P.loadSavedProject();assert.equal(P.state.textBoxes.length,2);assert.equal(d.querySelectorAll('.text-box').length,2);
+  P.addComponent('CPU');const saved=JSON.parse(JSON.stringify(P.state));delete saved.appearance;delete saved.textBoxes;saved.components.forEach(c=>{delete c.fontFamily;delete c.fontSize;delete c.textColor;});assert.equal(P.importProjectText(JSON.stringify(saved)),true);assert.equal(P.state.appearance.theme,'dark');assert.equal(P.state.textBoxes.length,0);assert.equal(P.state.components[0].fontFamily,'Segoe UI');E.clean();
+});
+
+

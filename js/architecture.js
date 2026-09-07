@@ -50,8 +50,11 @@
     // CSS declarations override SVG presentation attributes. Set the live
     // color as an inline style so the editor and exported SVG/PNG agree.
     body.setAttribute('fill',renderColor);body.style.fill=renderColor;
+    const font=c.fontFamily||'Segoe UI',size=c.fontSize||15,textColor=c.textColor||'#dce5ee';
+    for(const node of g.querySelectorAll('.name,.part,.category,.ref')){node.style.fontFamily=font;node.style.fill=textColor;}
+    g.querySelector('.name').style.fontSize=size+'px';g.querySelector('.part').style.fontSize=Math.max(9,size*.73)+'px';g.querySelector('.category').style.fontSize=Math.max(8,size*.6)+'px';g.querySelector('.ref').style.fontSize=Math.max(8,size*.6)+'px';
     g.querySelector('.stripe').setAttribute('fill',color);g.querySelector('.symbol').setAttribute('fill',color);g.querySelector('.symbol').textContent=P.icons[c.category]||'□';
-    g.querySelector('.category').setAttribute('fill',color);g.querySelector('.category').textContent=c.category.toUpperCase();
+    g.querySelector('.category').textContent=c.category.toUpperCase();
     g.querySelector('.name').textContent=c.name;g.querySelector('.part').textContent=c.partNumber||'No part number';g.querySelector('.ref').textContent='ID '+c.id.slice(0,8).toUpperCase();
   }
   P.state.components.forEach(c=>draw(c));

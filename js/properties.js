@@ -8,13 +8,13 @@
     if(options.choices)for(const choice of options.choices){const [v,label]=Array.isArray(choice)?choice:[choice,choice];const option=document.createElement('option');option.value=v;option.textContent=label;input.append(option);}
     else if(!options.multiline)input.type=options.color?'color':options.number?'number':'text';
     input.value=value??'';if(options.name)input.name=options.name;
-    if(options.number){input.min=options.min??0;input.step=1;}else input.maxLength=options.multiline?2000:120;
+    if(options.number){input.min=options.min??0;if(options.max!==undefined)input.max=options.max;input.step=1;}else input.maxLength=options.multiline?2000:120;
     if(options.readonly)input.readOnly=true;
     if(options.placeholder)input.placeholder=options.placeholder;
     input.addEventListener(options.commit?'change':'input',()=>{
       let value=input.value;
       if(options.required&&!value.trim()){input.setCustomValidity('A value is required.');return;}
-      if(options.number){if(value===''&&options.nullable)value=null;else {value=Number(value);if(input.value===''||!Number.isFinite(value)||value<Number(input.min)||!Number.isInteger(value)){input.setCustomValidity(`Enter an integer of at least ${input.min}.`);return;}}}
+      if(options.number){if(value===''&&options.nullable)value=null;else {value=Number(value);if(input.value===''||!Number.isFinite(value)||value<Number(input.min)||(input.max&&value>Number(input.max))||!Number.isInteger(value)){input.setCustomValidity(`Enter a whole number from ${input.min}${input.max?' to '+input.max:''}.`);return;}}}
       input.setCustomValidity('');onChange?.(value,input);
     });
     wrapper.append(input);parent.append(wrapper);return input;
@@ -33,6 +33,17 @@
       input.addEventListener('blur',()=>{input.value=line[key];input.setCustomValidity('');});
     }
     const remove=text('button','danger-button','Delete line');remove.addEventListener('click',()=>P.removeLine(line.id));panel.append(remove);
+  }
+  function textBox(box){
+    const header=heading(box.text.split('\n')[0]||'文字框','Text box / annotation','T');
+    field(panel,'Text',box.text,value=>{P.updateTextBox(box.id,{text:value});header.querySelector('h2').textContent=value.split('\n')[0]||'文字框';},{multiline:true});
+    field(panel,'Font',box.fontFamily,value=>P.updateTextBox(box.id,{fontFamily:value}),{choices:P.fonts});
+    field(panel,'Font Size',box.fontSize,value=>P.updateTextBox(box.id,{fontSize:value}),{number:true,min:8,max:96});
+    for(const [key,label] of [['textColor','Text Color'],['backgroundColor','Background Color'],['borderColor','Border Color']])field(panel,label,box[key],value=>P.updateTextBox(box.id,{[key]:value}),{color:true});
+    const dimensions=text('div','field-row','');
+    field(dimensions,'Width',box.width,value=>P.updateTextBox(box.id,{width:value}),{number:true,min:80});field(dimensions,'Height',box.height,value=>P.updateTextBox(box.id,{height:value}),{number:true,min:40});panel.append(dimensions);
+    panel.append(text('p','inspector-note','拖曳文字框移動；拖曳八個控制點縮放。文字會依寬度自動換行，超出高度的內容仍保留於 State。'));
+    const remove=text('button','danger-button','Delete text box');remove.addEventListener('click',()=>P.removeTextBox(box.id));panel.append(remove,text('div','uuid','TEXT UUID / '+box.id));
   }
   function connection(edge){
     const header=heading(edge.label||edge.interfaceType,'Logical connection / directed edge');
@@ -84,6 +95,9 @@
     const colorRow=text('div','color-field','');
     field(colorRow,'Block Color',c.renderColor||'#1c2938',value=>P.update(c.id,{renderColor:value}),{color:true});
     const reset=text('button','','使用預設色');reset.addEventListener('click',()=>{P.update(c.id,{renderColor:'#1c2938'});render();});colorRow.append(reset);panel.append(colorRow);
+    field(panel,'Font',c.fontFamily||'Segoe UI',value=>P.update(c.id,{fontFamily:value}),{choices:P.fonts});
+    field(panel,'Font Size',c.fontSize||15,value=>P.update(c.id,{fontSize:value}),{number:true,min:8,max:48});
+    field(panel,'Text Color',c.textColor||'#dce5ee',value=>P.update(c.id,{textColor:value}),{color:true});
     field(panel,'Rotation',c.rotation,value=>P.update(c.id,{rotation:Number(value)}),{choices:[['0','0°'],['90','90°'],['180','180°'],['270','270°']]});
     for(const [key,label] of [['description','Description'],['voltage','Voltage'],['frequency','Frequency'],['power','Power'],['notes','Notes']])field(panel,label,c[key],value=>P.update(c.id,{[key]:value}),{multiline:['description','notes'].includes(key)});
     ports(c);
@@ -97,18 +111,19 @@
     if(P.ui.selection.length>1){
       document.getElementById('selection-badge').textContent='MULTI SELECT';
       heading(`${P.ui.selection.length} 個物件已選取`,'框選 / Shift 點擊可調整選取範圍','▧');
-      for(const [kind,label] of [['component','方塊'],['connection','工程連線'],['line','獨立直線']])panel.append(text('p','inspector-note',`${label}：${P.ui.selection.filter(s=>s.kind===kind).length}`));
+      for(const [kind,label] of [['component','方塊'],['connection','工程連線'],['line','獨立直線'],['text','文字框']])panel.append(text('p','inspector-note',`${label}：${P.ui.selection.filter(s=>s.kind===kind).length}`));
       panel.append(text('p','inspector-note','拖曳選取的方塊或直線可整組移動。Ctrl+C 複製，Ctrl+V 貼上，Delete 刪除選取物件。點擊其他物件可回到單選編輯。'));
       return;
     }
     const c=P.ui.selectedKind==='component'?P.component(P.ui.selected):null,edge=P.ui.selectedKind==='connection'?P.connection(P.ui.selected):null;
     const line=P.ui.selectedKind==='line'?P.line(P.ui.selected):null;
-    document.getElementById('selection-badge').textContent=c?'COMPONENT':edge?'CONNECTION':line?'LINE':'NO SELECTION';
-    if(c)component(c);else if(edge)connection(edge);else if(line)freeLine(line);else {const empty=text('div','no-selection','');empty.append(text('div','icon','⌖'),text('strong','','Inspect your engineering graph'),text('p','','Select a block, connection or free line to edit. Use Line to draw independent lines with adjustable arrows.'));panel.append(empty);}
+    const box=P.ui.selectedKind==='text'?P.textBox(P.ui.selected):null;
+    document.getElementById('selection-badge').textContent=c?'COMPONENT':edge?'CONNECTION':line?'LINE':box?'TEXT':'NO SELECTION';
+    if(c)component(c);else if(edge)connection(edge);else if(line)freeLine(line);else if(box)textBox(box);else {const empty=text('div','no-selection','');empty.append(text('div','icon','⌖'),text('strong','','Inspect your engineering graph'),text('p','','Select a block, connection, line or text box to edit.'));panel.append(empty);}
     panel.scrollTop=scroll;
   }
   P.subscribe(({type,id})=>{
-    if(['selection','remove','connection-remove','line-remove','clear','project-load'].includes(type))render();
+    if(['selection','remove','connection-remove','line-remove','text-remove','clear','project-load'].includes(type))render();
     if(type==='line-update'&&P.ui.selected===id){const line=P.line(id);for(const key of ['x1','y1','x2','y2']){const input=panel.querySelector(`[name="${key}"]`);if(input&&document.activeElement!==input)input.value=line[key];}}
     if(type==='ports'){
       if(!panel.contains(document.activeElement)||!document.activeElement.matches('input,select,textarea'))render();

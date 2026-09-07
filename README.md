@@ -43,6 +43,12 @@ Phase 1 Engineering Graph MVP。直接以 Chrome / Edge 開啟 `index.html`，�
 
 選取任一方塊後，可在右側 Properties 的 **Block Color** 使用色彩選擇器即時設定填滿色；「使用預設色」恢復 `#1c2938`。顏色會隨複製貼上、存檔、JSON 與 PNG 保留。
 
+## 主題與文字
+
+- 工具列的 **淺色／深色** 按鈕可切換整個編輯器；選擇會寫入專案，PNG 也會使用目前主題的工作區背景。
+- 選取方塊後，可在 Properties 調整 **Font、Font Size、Text Color**，設定會立即套用並隨複製、存檔與匯出保留。
+- 點選 **T 文字框** 後在畫布拖曳即可建立註解。文字框支援多行文字、自動換行、字型、字級、文字色、背景色、框線色、移動、八方向縮放、框選、複製貼上與刪除。
+
 ## 操作
 
 - 左側提供 40 種元件。拖到 Architecture 畫布，或點擊加入。
@@ -84,6 +90,8 @@ Undo/Redo、Zoom/Pan 仍屬後續工作；PCB Placement、Zone／Design Check、
 - `js/geometry.js`：八方向縮放、旋轉、Port 排列、錨點與路徑純計算。
 - `js/connection.js`：SVG Edge 增量更新、連線預覽與建立流程。
 - `js/workspace.js`：工作區尺寸、鏡頭範圍、縮放、平移與 Fit View。
+- `js/theme.js`：深色／淺色主題切換與專案狀態同步。
+- `js/text-box.js`：文字框建立、渲染、移動、縮放與選取。
 - `js/storage.js`：本機存檔、JSON 驗證與匯入匯出、完整 SVG-to-PNG 渲染。
 - `js/clipboard.js`：選取快照、貼上 UUID 與端點重建。
 - `js/selection.js`：框選、Shift 多選、群組拖曳。

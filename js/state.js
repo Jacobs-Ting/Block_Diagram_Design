@@ -3,8 +3,9 @@
   P.uuid = () => globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16);});
   P.sides = ['top','right','bottom','left'];
   P.interfaces = ['Digital','PCIe','USB','SPI','I2C','UART','GPIO','MIPI','SerDes','Ethernet','RF','Clock','Power','Ground','Analog'];
+  P.fonts = ['Segoe UI','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Courier New','Consolas'];
   P.interfaceColors = {Digital:'#96adca',PCIe:'#83acff',USB:'#af9dfa',SPI:'#78c6dc',I2C:'#78c6dc',UART:'#98b8cc',GPIO:'#98b8cc',MIPI:'#d1a5ef',SerDes:'#83acff',Ethernet:'#79d4ca',RF:'#61d3b3',Clock:'#e6c57d',Power:'#ed9b79',Ground:'#9da8b4',Analog:'#d996bd'};
-  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:2},workspace:{width:1400,height:850},board:{width:160,height:100,unit:'mm'},components:[],ports:[],connections:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
+  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,unit:'mm'},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
   P.ui = {tab:'architecture',selected:null,selectedKind:null,snap:true,mode:'select'};
   const listeners = new Set();
   P.subscribe = fn => {listeners.add(fn);return()=>listeners.delete(fn);};
@@ -21,20 +22,21 @@
   };
   P.addComponent = (name,x=70,y=100,extra={}) => {
     const template=P.library.find(c=>c.name===name)||{name,category:'Other'};
-    const c={name:template.name,type:template.name,category:template.category,vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',x,y,width:200,height:112,rotation:0,minWidth:180,minHeight:112,...extra,id:P.uuid()};
+    const c={name:template.name,type:template.name,category:template.category,vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,minWidth:180,minHeight:112,...extra,id:P.uuid()};
     P.state.components.push(c);P.notify('add',c.id);return c;
   };
   P.ui.selection=[];
   P.isSelected = (id,kind) => P.ui.selection.some(item=>item.id===id&&item.kind===kind);
   P.selectMany = items => {
     const unique=new Map();
-    for(const item of items){const exists=item.kind==='component'?P.component(item.id):item.kind==='connection'?P.connection(item.id):item.kind==='line'?P.line(item.id):null;if(exists)unique.set(item.kind+item.id,{id:item.id,kind:item.kind});}
+    for(const item of items){const exists=item.kind==='component'?P.component(item.id):item.kind==='connection'?P.connection(item.id):item.kind==='line'?P.line(item.id):item.kind==='text'?P.textBox(item.id):null;if(exists)unique.set(item.kind+item.id,{id:item.id,kind:item.kind});}
     P.ui.selection=[...unique.values()];const only=P.ui.selection.length===1?P.ui.selection[0]:null;
     P.ui.selected=only?.id||null;P.ui.selectedKind=only?.kind||(P.ui.selection.length?'multiple':null);
     P.notify('selection',P.ui.selected);
   };
   P.select = (id,kind='component') => P.selectMany(id?[{id,kind}]:[]);
-  P.setMode = mode => {P.ui.mode=['connect','line','pan'].includes(mode)?mode:'select';P.notify('mode');};
+  P.setMode = mode => {P.ui.mode=['connect','line','text','pan'].includes(mode)?mode:'select';P.notify('mode');};
+  P.setTheme = theme => {P.state.appearance.theme=theme==='light'?'light':'dark';P.notify('theme');};
   P.resizeWorkspace = (width,height) => {
     width=Math.round(Number(width));height=Math.round(Number(height));
     if(!Number.isFinite(width)||!Number.isFinite(height)||width<400||height<300||width>10000||height>10000)return P.warn('工作區寬度須為 400–10000，高度須為 300–10000。');
@@ -55,11 +57,25 @@
     if(!validLine(next))return false;Object.assign(line,next);P.notify('line-update',id);return true;
   };
   P.removeLine = id => {P.state.lines=P.state.lines.filter(line=>line.id!==id);if(P.ui.selected===id){P.ui.selected=null;P.ui.selectedKind=null;}P.notify('line-remove',id);};
+  P.textBox = id => P.state.textBoxes.find(box=>box.id===id);
+  P.addTextBox = (geometry,options={}) => {
+    const box={id:P.uuid(),x:geometry.x,y:geometry.y,width:Math.max(80,geometry.width||240),height:Math.max(40,geometry.height||100),text:options.text||'輸入文字',fontSize:options.fontSize||18,fontFamily:options.fontFamily||'Segoe UI',textColor:options.textColor||'#dce5ee',backgroundColor:options.backgroundColor||'#1c2938',borderColor:options.borderColor||'#60778b'};
+    P.state.textBoxes.push(box);P.notify('text-add',box.id);return box;
+  };
+  P.updateTextBox = (id,changes) => {
+    const box=P.textBox(id);if(!box)return false;const next={...box,...changes};
+    if(!['x','y','width','height','fontSize'].every(key=>Number.isFinite(next[key]))||next.width<80||next.height<40||next.fontSize<8||next.fontSize>96||!P.fonts.includes(next.fontFamily)||![next.textColor,next.backgroundColor,next.borderColor].every(color=>/^#[0-9a-f]{6}$/i.test(color)))return false;
+    Object.assign(box,next);P.notify('text-update',id);return true;
+  };
+  P.removeTextBox = id => {P.state.textBoxes=P.state.textBoxes.filter(box=>box.id!==id);if(P.ui.selected===id)P.select(null);P.notify('text-remove',id);};
   P.update = (id,changes,type='update') => {
     const c=P.component(id);if(!c)return false;
     const next={...changes};
     for(const key of ['x','y','width','height','rotation'])if(key in next&&!Number.isFinite(next[key]))return false;
     if('renderColor' in next&&!/^#[0-9a-f]{6}$/i.test(next.renderColor))return false;
+    if('textColor' in next&&!/^#[0-9a-f]{6}$/i.test(next.textColor))return false;
+    if('fontFamily' in next&&!P.fonts.includes(next.fontFamily))return false;
+    if('fontSize' in next&&(!Number.isFinite(next.fontSize)||next.fontSize<8||next.fontSize>48))return false;
     const min=P.minimumSize(id);
     if('width' in next)next.width=Math.max(min.width,next.width);
     if('height' in next)next.height=Math.max(min.height,next.height);
@@ -118,6 +134,7 @@
     P.setMode('select');P.select(null);
     for(const {id,kind} of items){
       if(kind==='line'){P.removeLine(id);continue;}
+      if(kind==='text'){P.removeTextBox(id);continue;}
       if(kind==='connection'){P.removeConnection(id);continue;}
       P.state.components=P.state.components.filter(c=>c.id!==id);
       P.state.ports=P.state.ports.filter(p=>p.componentId!==id);
@@ -130,13 +147,13 @@
     // Cancel active gestures before discarding data so previews cannot commit
     // stale objects after clearing. Keep project, board and rule settings.
     P.setMode('select');
-    for(const key of ['components','ports','connections','lines','placements','zones'])P.state[key]=[];
+    for(const key of ['components','ports','connections','lines','textBoxes','placements','zones'])P.state[key]=[];
     P.ui.selected=null;P.ui.selectedKind=null;P.ui.selection=[];P.ui.warning='';
     P.notify('clear');
   };
   P.subscribe(({type})=>{
     if(!['remove','line-remove','connection-remove','ports'].includes(type))return;
-    const valid=P.ui.selection.filter(s=>s.kind==='component'?P.component(s.id):s.kind==='line'?P.line(s.id):P.connection(s.id));
+    const valid=P.ui.selection.filter(s=>s.kind==='component'?P.component(s.id):s.kind==='line'?P.line(s.id):s.kind==='text'?P.textBox(s.id):P.connection(s.id));
     if(valid.length!==P.ui.selection.length)P.selectMany(valid);
   });
 })(window.Planner);
