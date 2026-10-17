@@ -11,7 +11,7 @@
     const workspace=raw.workspace;
     if(!workspace||!Number.isFinite(workspace.width)||!Number.isFinite(workspace.height)||workspace.width<400||workspace.height<300||workspace.width>10000||workspace.height>10000)throw new Error('工作區尺寸無效。');
     const ids=new Set(),claim=item=>{if(!item||typeof item.id!=='string'||!item.id||ids.has(item.id))throw new Error('專案包含遺失或重複的 UUID。');ids.add(item.id);};
-    raw.components.forEach(c=>{claim(c);if(typeof c.name!=='string'||!['x','y','width','height','rotation'].every(key=>Number.isFinite(c[key]))||c.width<1||c.height<1)throw new Error('方塊資料無效。');c.renderColor=c.renderColor||'#1c2938';c.textColor=c.textColor||'#dce5ee';c.fontFamily=c.fontFamily||'Segoe UI';c.fontSize=c.fontSize||15;if(![c.renderColor,c.textColor].every(color=>/^#[0-9a-f]{6}$/i.test(color))||!P.fonts.includes(c.fontFamily)||!Number.isFinite(c.fontSize)||c.fontSize<8||c.fontSize>48)throw new Error('方塊文字或顏色格式無效。');});
+    raw.components.forEach(c=>{claim(c);if(typeof c.name!=='string'||!['x','y','width','height','rotation'].every(key=>Number.isFinite(c[key]))||c.width<1||c.height<1)throw new Error('方塊資料無效。');c.shape=c.shape||'rectangle';c.renderColor=c.renderColor||'#1c2938';c.textColor=c.textColor||'#dce5ee';c.fontFamily=c.fontFamily||'Segoe UI';c.fontSize=c.fontSize||15;if(!P.shapes.includes(c.shape)||![c.renderColor,c.textColor].every(color=>/^#[0-9a-f]{6}$/i.test(color))||!P.fonts.includes(c.fontFamily)||!Number.isFinite(c.fontSize)||c.fontSize<8||c.fontSize>48)throw new Error('方塊文字、形狀或顏色格式無效。');});
     const componentIds=new Set(raw.components.map(c=>c.id));
     raw.ports.forEach(port=>{claim(port);if(!componentIds.has(port.componentId)||!P.sides.includes(port.side)||!P.interfaces.includes(port.type))throw new Error('Port 參照或類型無效。');});
     const portMap=new Map(raw.ports.map(port=>[port.id,port]));
@@ -34,7 +34,7 @@
   P.buildExportSvg=()=>{
     const source=document.getElementById('canvas'),copy=source.cloneNode(true),{width,height}=P.state.workspace;
     copy.setAttribute('xmlns','http://www.w3.org/2000/svg');copy.setAttribute('viewBox',`0 0 ${width} ${height}`);copy.setAttribute('width',width);copy.setAttribute('height',height);
-    copy.querySelectorAll('.selection-box,#connection-preview,.free-line-preview,.resize-handles,.text-handles,.connection-point,.edge-hit,.edge-halo,.free-line-hit,.free-line-halo,.line-handle').forEach(node=>node.remove());
+    copy.querySelectorAll('.selection-box,#connection-preview,.free-line-preview,.resize-handles,.rotation-controls,.text-handles,.connection-point,.edge-hit,.edge-halo,.free-line-hit,.free-line-halo,.line-handle').forEach(node=>node.remove());
     copy.querySelectorAll('.selected').forEach(node=>node.classList.remove('selected'));
     let css='';for(const sheet of document.styleSheets){try{css+=[...sheet.cssRules].map(rule=>rule.cssText).join('\n');}catch{}}
     const style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent=css;copy.querySelector('defs').append(style);

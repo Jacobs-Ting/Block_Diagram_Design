@@ -28,7 +28,7 @@
   reconcile();
   P.subscribe(({type,id})=>{
     if(['connection-add','connection-remove','remove','ports','clear','project-load'].includes(type))reconcile();
-    else if(['move','resize','update'].includes(type))P.state.connections.filter(e=>e.source.componentId===id||e.target.componentId===id).forEach(draw);
+    else if(['move','resize','rotate','update'].includes(type))P.state.connections.filter(e=>e.source.componentId===id||e.target.componentId===id).forEach(draw);
     else if(type==='connection-update'){const edge=P.connection(id);if(edge)draw(edge);}
     else if(type==='selection')nodes.forEach((g,key)=>g.classList.toggle('selected',P.isSelected(key,'connection')));
     if(type==='mode'||type==='tab'||type==='remove'||type==='ports')cancel();

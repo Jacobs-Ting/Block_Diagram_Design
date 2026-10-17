@@ -3,6 +3,11 @@
   const svg=document.getElementById('canvas'),layer=document.getElementById('blocks');
   const nodes=new Map(),{element,attributes,point}=P.svg;
   const handles=['nw','n','ne','e','se','s','sw','w'];
+  function bodyElement(c){
+    if(c.shape==='circle')return element('ellipse',{class:'body'});
+    if(c.shape==='triangle'||c.shape==='diamond')return element('polygon',{class:'body'});
+    return element('rect',{class:'body',rx:7});
+  }
   function points(c,g){
     const target=g.querySelector('.points');target.replaceChildren();
     const endpoints=[...P.sides.map(anchor=>({componentId:c.id,portId:null,anchor})),...P.componentPorts(c.id).map(p=>({componentId:c.id,portId:p.id,anchor:p.side}))];
@@ -16,7 +21,11 @@
   }
   function layout(c,g){
     attributes(g,{transform:`translate(${c.x} ${c.y}) rotate(${c.rotation} ${c.width/2} ${c.height/2})`});
-    attributes(g.querySelector('.body'),{width:c.width,height:c.height});
+    const body=g.querySelector('.body');
+    if(c.shape==='circle')attributes(body,{cx:c.width/2,cy:c.height/2,rx:c.width/2,ry:c.height/2});
+    else if(c.shape==='triangle')attributes(body,{points:`${c.width/2},0 ${c.width},${c.height} 0,${c.height}`});
+    else if(c.shape==='diamond')attributes(body,{points:`${c.width/2},0 ${c.width},${c.height/2} ${c.width/2},${c.height} 0,${c.height/2}`});
+    else attributes(body,{width:c.width,height:c.height});
     attributes(g.querySelector('.text-clip'),{width:c.width-32,height:c.height-12});
     for(const node of g.querySelectorAll('.connection-point')){
       const end=P.connectionUI.endpointFromNode(node),p=P.geometry.anchorLocal(end);attributes(node,{transform:`translate(${p.x} ${p.y})`});
@@ -29,6 +38,8 @@
       const h=node.dataset.handle,x=h.includes('w')?-16:h.includes('e')?c.width+16:c.width/2,y=h.includes('n')?-16:h.includes('s')?c.height+16:c.height/2;
       attributes(node,{x:x-5,y:y-5});
     }
+    attributes(g.querySelector('.rotation-stem'),{x1:c.width/2,y1:-16,x2:c.width/2,y2:-46});
+    attributes(g.querySelector('.rotation-handle'),{cx:c.width/2,cy:-52});
   }
   function draw(c,structural=false){
     let g=nodes.get(c.id);
@@ -38,9 +49,12 @@
       const text=element('g',{'clip-path':`url(#clip-${c.id})`});
       text.append(element('text',{class:'symbol',x:16,y:31}),element('text',{class:'category',x:43,y:28}),element('text',{class:'name',x:16,y:58}),element('text',{class:'part',x:16,y:80}),element('text',{class:'ref',x:16,y:100}));
       const grips=element('g',{class:'resize-handles'});handles.forEach(h=>grips.append(element('rect',{class:'resize-handle','data-handle':h,width:10,height:10,rx:2})));
-      g.append(clip,element('rect',{class:'body',rx:7}),element('rect',{class:'stripe',x:0,y:18,width:3,height:30,rx:1}),text,grips,element('g',{class:'points'}),element('title',{class:'block-title'}));
+      const rotation=element('g',{class:'rotation-controls'});rotation.append(element('line',{class:'rotation-stem'}),element('circle',{class:'rotation-handle',r:8,tabindex:0,role:'button','aria-label':'拖曳旋轉圖形'}));
+      g.append(clip,bodyElement(c),element('rect',{class:'stripe',x:0,y:18,width:3,height:30,rx:1}),text,grips,rotation,element('g',{class:'points'}),element('title',{class:'block-title'}));
       nodes.set(c.id,g);layer.append(g);structural=true;
     }
+    const expected=c.shape==='circle'?'ellipse':c.shape==='triangle'||c.shape==='diamond'?'polygon':'rect';
+    if(g.querySelector('.body').tagName.toLowerCase()!==expected)g.querySelector('.body').replaceWith(bodyElement(c));
     if(structural)points(c,g);
     layout(c,g);g.classList.toggle('selected',P.isSelected(c.id,'component'));
     g.setAttribute('aria-label',`${c.name}, ${c.category}`);
@@ -83,15 +97,16 @@
     const g=e.target.closest('.block');if(!g){P.select(null);return;}
     e.preventDefault();const c=P.component(g.dataset.id);P.select(c.id);svg.focus();
     if(P.ui.mode==='connect')return;
-    const p=point(e),handle=e.target.closest('.resize-handle')?.dataset.handle;
-    drag={id:c.id,handle,start:p,original:{...c}};svg.setPointerCapture(e.pointerId);g.classList.add('dragging');
+    const p=point(e),handle=e.target.closest('.resize-handle')?.dataset.handle,rotating=!!e.target.closest('.rotation-handle'),center={x:c.x+c.width/2,y:c.y+c.height/2};
+    drag={id:c.id,handle,rotating,start:p,startAngle:Math.atan2(p.y-center.y,p.x-center.x)*180/Math.PI,original:{...c}};svg.setPointerCapture(e.pointerId);g.classList.add('dragging');
   });
   svg.addEventListener('pointermove',e=>{
     const p=point(e);document.getElementById('coordinates').textContent=`X ${Math.round(p.x)}  Y ${Math.round(p.y)}`;
     P.connectionUI.move(e);if(!drag)return;
     const c=P.component(drag.id);if(!c){endDrag();return;}
     const delta={x:p.x-drag.start.x,y:p.y-drag.start.y};
-    if(drag.handle)P.update(c.id,P.geometry.resize(drag.original,drag.handle,delta,P.ui.snap,P.minimumSize(c.id)),'resize');
+    if(drag.rotating){const center={x:drag.original.x+drag.original.width/2,y:drag.original.y+drag.original.height/2},angle=Math.atan2(p.y-center.y,p.x-center.x)*180/Math.PI;let rotation=drag.original.rotation+angle-drag.startAngle;if(P.ui.snap)rotation=Math.round(rotation/15)*15;P.update(c.id,{rotation},'rotate');}
+    else if(drag.handle)P.update(c.id,P.geometry.resize(drag.original,drag.handle,delta,P.ui.snap,P.minimumSize(c.id)),'resize');
     else {const snap=n=>P.ui.snap?Math.round(n/20)*20:n;P.update(c.id,{x:snap(drag.original.x+delta.x),y:snap(drag.original.y+delta.y)},'move');}
   });
   svg.addEventListener('pointerup',e=>{P.connectionUI.release(e);endDrag();});
@@ -110,6 +125,6 @@
     e.preventDefault();svg.classList.remove('drop-active');const name=e.dataTransfer.getData('application/x-stratum-component');if(!P.library.some(c=>c.name===name))return;
     const p=point(e),snap=n=>P.ui.snap?Math.round(n/20)*20:n;const c=P.addComponent(name,snap(p.x-100),snap(p.y-56));P.select(c.id);
   });
-  P.addAtCenter=name=>{const offset=(P.state.components.length%6)*20;const c=P.addComponent(name,540+offset,620+offset);P.select(c.id);};
+  P.addAtCenter=(name,extra={})=>{const offset=(P.state.components.length%6)*20;const c=P.addComponent(name,540+offset,620+offset,extra);P.select(c.id);return c;};
 })(window.Planner);
 

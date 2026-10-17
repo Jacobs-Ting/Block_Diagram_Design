@@ -23,7 +23,7 @@
   }
   svg.addEventListener('pointerdown',e=>{
     if(e.button!==0||P.ui.mode!=='select'||P.connectionUI.isPending())return;
-    if(e.target.closest('.connection-point,.resize-handle,.line-handle'))return;
+    if(e.target.closest('.connection-point,.resize-handle,.rotation-handle,.line-handle'))return;
     const item=selectable(e.target),additive=e.shiftKey||e.ctrlKey||e.metaKey;
     if(item){
       if(additive){e.preventDefault();e.stopImmediatePropagation();P.selectMany(P.isSelected(item.id,item.kind)?P.ui.selection.filter(s=>s.id!==item.id):[...P.ui.selection,item]);return;}

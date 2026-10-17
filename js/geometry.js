@@ -15,9 +15,27 @@
       const i=peers.findIndex(e=>e.id===edgeId);
       if(i>=0)along+=(i-(peers.length-1)/2)*Math.min(10,length/(count+1)/Math.max(1,peers.length));
     }
-    return {x:side==='left'?0:side==='right'?c.width:along,y:side==='top'?0:side==='bottom'?c.height:along,side};
+    let point={x:side==='left'?0:side==='right'?c.width:along,y:side==='top'?0:side==='bottom'?c.height:along,side};
+    if(c.shape&&c.shape!=='rectangle'){
+      const center={x:c.width/2,y:c.height/2},ray={x:point.x-center.x,y:point.y-center.y};
+      if(c.shape==='circle'){
+        const scale=1/Math.sqrt((ray.x*ray.x)/(center.x*center.x)+(ray.y*ray.y)/(center.y*center.y));
+        point={x:center.x+ray.x*scale,y:center.y+ray.y*scale,side};
+      }else{
+        const vertices=c.shape==='triangle'?[{x:c.width/2,y:0},{x:c.width,y:c.height},{x:0,y:c.height}]:[{x:c.width/2,y:0},{x:c.width,y:c.height/2},{x:c.width/2,y:c.height},{x:0,y:c.height/2}];
+        let best=Infinity;
+        for(let i=0;i<vertices.length;i++){
+          const a=vertices[i],b=vertices[(i+1)%vertices.length],segment={x:b.x-a.x,y:b.y-a.y},den=ray.x*segment.y-ray.y*segment.x;
+          if(Math.abs(den)<1e-8)continue;
+          const q={x:a.x-center.x,y:a.y-center.y},t=(q.x*segment.y-q.y*segment.x)/den,u=(q.x*ray.y-q.y*ray.x)/den;
+          if(t>=0&&u>=0&&u<=1)best=Math.min(best,t);
+        }
+        if(Number.isFinite(best))point={x:center.x+ray.x*best,y:center.y+ray.y*best,side};
+      }
+    }
+    return point;
   }
-  function anchor(end,edgeId){const c=P.component(end.componentId),p=anchorLocal(end,edgeId);if(!p)return null;const point=world(c,p),n=rotate(normals[p.side],c.rotation);return{...point,nx:Math.round(n.x),ny:Math.round(n.y)};}
+  function anchor(end,edgeId){const c=P.component(end.componentId),p=anchorLocal(end,edgeId);if(!p)return null;const point=world(c,p),n=rotate(normals[p.side],c.rotation),horizontal=Math.abs(n.x)>=Math.abs(n.y);return{...point,nx:horizontal?Math.sign(n.x):0,ny:horizontal?0:Math.sign(n.y)};}
   // Treat reverse edges as part of the same bundle. IDs and local anchors,
   // rather than rendered coordinates, keep lane membership stable on resize.
   function parallelEdges(edge){

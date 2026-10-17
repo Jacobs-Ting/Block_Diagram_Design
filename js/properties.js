@@ -86,6 +86,7 @@
       const input=field(panel,label,c[key],value=>{P.update(c.id,{[key]:value});if(key==='name')header.querySelector('h2').textContent=value;if(key==='category')header.querySelector('.chip-icon').textContent=P.icons[value];},{name:key,required:key==='name',choices:key==='category'?Object.keys(P.groups):null});
       input.addEventListener('blur',()=>{if(key==='name'&&!input.value.trim()){input.value=c.name;input.setCustomValidity('');}});
     }
+    field(panel,'形狀',c.shape||'rectangle',value=>P.update(c.id,{shape:value}),{choices:[['rectangle','方形'],['circle','圓形'],['triangle','三角形'],['diamond','菱形']]});
     const min=P.minimumSize(c.id),sizes=text('div','field-row','');
     for(const key of ['width','height']){
       const input=field(sizes,key==='width'?'Width':'Height',c[key],value=>P.update(c.id,{[key]:value},'resize'),{name:key,number:true,min:min[key]});
@@ -98,7 +99,7 @@
     field(panel,'Font',c.fontFamily||'Segoe UI',value=>P.update(c.id,{fontFamily:value}),{choices:P.fonts});
     field(panel,'Font Size',c.fontSize||15,value=>P.update(c.id,{fontSize:value}),{number:true,min:8,max:48});
     field(panel,'Text Color',c.textColor||'#dce5ee',value=>P.update(c.id,{textColor:value}),{color:true});
-    field(panel,'Rotation',c.rotation,value=>P.update(c.id,{rotation:Number(value)}),{choices:[['0','0°'],['90','90°'],['180','180°'],['270','270°']]});
+    field(panel,'旋轉角度',Math.round(c.rotation*10)/10,value=>P.update(c.id,{rotation:Number(value)},'rotate'),{name:'rotation',number:true,min:0,max:359});
     for(const [key,label] of [['description','Description'],['voltage','Voltage'],['frequency','Frequency'],['power','Power'],['notes','Notes']])field(panel,label,c[key],value=>P.update(c.id,{[key]:value}),{multiline:['description','notes'].includes(key)});
     ports(c);
     const edges=P.state.connections.filter(e=>e.source.componentId===c.id||e.target.componentId===c.id);
@@ -135,5 +136,6 @@
       }
     }
     if(type==='resize'&&id===P.ui.selected){const c=P.component(id);for(const key of ['width','height']){const input=panel.querySelector(`[name="${key}"]`);if(input&&document.activeElement!==input)input.value=Math.round(c[key]);}}
+    if(type==='rotate'&&id===P.ui.selected){const input=panel.querySelector('[name="rotation"]');if(input&&document.activeElement!==input)input.value=Math.round(P.component(id).rotation*10)/10;}
   });render();
 })(window.Planner);

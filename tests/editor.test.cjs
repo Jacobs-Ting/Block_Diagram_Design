@@ -43,6 +43,26 @@ test('Page loads with demo, selection/property editing and tabs preserve the gra
   d.querySelector('[data-tab="architecture"]').click();assert.equal(d.querySelector('#architecture-view').hidden,false);assert.equal(JSON.stringify(P.state),before);
   E.clean();
 });
+test('Shape toolbar creates circle, triangle and diamond blocks and inspector can change shape',()=>{
+  const E=editor(),{P,d,input,field}=E;P.clearCanvas();
+  for(const [id,shape,tag] of [['add-circle','circle','ellipse'],['add-triangle','triangle','polygon'],['add-diamond','diamond','polygon']]){
+    d.querySelector('#'+id).click();const c=P.component(P.ui.selected),body=d.querySelector(`[data-id="${c.id}"] .body`);
+    assert.equal(c.shape,shape);assert.equal(body.tagName.toLowerCase(),tag);
+    for(const side of P.sides){const point=P.geometry.anchorLocal({componentId:c.id,portId:null,anchor:side});assert.ok(point.x>=0&&point.x<=c.width);assert.ok(point.y>=0&&point.y<=c.height);}
+  }
+  input(field('形狀'),'rectangle');const selected=P.component(P.ui.selected);
+  assert.equal(selected.shape,'rectangle');assert.equal(d.querySelector(`[data-id="${selected.id}"] .body`).tagName.toLowerCase(),'rect');
+  E.clean();
+});
+test('Selected shapes rotate from the canvas handle and attached connections update immediately',()=>{
+  const E=editor(),{P,d,svg,pointer,field}=E;
+  const cpu=P.state.components.find(c=>c.name==='CPU'),block=d.querySelector(`[data-id="${cpu.id}"]`),edge=P.state.connections.find(e=>e.source.componentId===cpu.id||e.target.componentId===cpu.id),path=d.querySelector(`[data-edge-id="${edge.id}"] .edge-line`);
+  P.select(cpu.id);const before=path.getAttribute('d'),center={x:cpu.x+cpu.width/2,y:cpu.y+cpu.height/2},handle=block.querySelector('.rotation-handle');
+  pointer(handle,'pointerdown',center.x,center.y-52);pointer(svg,'pointermove',center.x+52,center.y);pointer(svg,'pointerup',center.x+52,center.y);
+  assert.equal(cpu.rotation,90);assert.equal(field('旋轉角度').value,'90');assert.notEqual(path.getAttribute('d'),before);
+  P.ui.snap=false;pointer(handle,'pointerdown',center.x+52,center.y);pointer(svg,'pointermove',center.x+48,center.y+20);pointer(svg,'pointerup',center.x+48,center.y+20);assert.notEqual(cpu.rotation%15,0);
+  E.clean();
+});
 test('Actual pointer handlers move and resize existing SVG nodes and live size fields',()=>{
   const E=editor(),{P,d,svg,pointer,input,field}=E;
   const cpu=P.state.components.find(c=>c.name==='CPU'),block=d.querySelector(`[data-id="${cpu.id}"]`),edge=P.state.connections.find(e=>e.source.componentId===cpu.id),line=d.querySelector(`[data-edge-id="${edge.id}"] .edge-line`),before=line.getAttribute('d');

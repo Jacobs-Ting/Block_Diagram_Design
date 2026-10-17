@@ -20,7 +20,7 @@
     document.getElementById('paste-selection').disabled=!P.hasClipboard();
     if(P.ui.selection.length>1)document.getElementById('selection-status').textContent=`${P.ui.selection.length} 個物件已選取`;
     document.getElementById('clear-canvas').disabled=!['components','ports','connections','lines','textBoxes','placements','zones'].some(key=>P.state[key].length);
-    const messages={remove:'Component and related links deleted',add:'Component added',update:'Properties updated',resize:'Block resized','connection-add':'Connection created','connection-remove':'Connection deleted','connection-update':'Connection updated',ports:'Port settings updated','text-add':'文字框已新增','text-update':'文字框已更新','text-remove':'文字框已刪除',theme:'顯示主題已切換'};
+    const messages={remove:'Component and related links deleted',add:'Component added',update:'Properties updated',resize:'Block resized',rotate:'圖形已旋轉','connection-add':'Connection created','connection-remove':'Connection deleted','connection-update':'Connection updated',ports:'Port settings updated','text-add':'文字框已新增','text-update':'文字框已更新','text-remove':'文字框已刪除',theme:'顯示主題已切換'};
     if(messages[type])document.getElementById('status').textContent=messages[type];
     const warning=document.getElementById('graph-warning');warning.hidden=!P.ui.warning;warning.querySelector('span').textContent=P.ui.warning||'';
     if(P.ui.tab==='placement'&&!['move','resize','warning'].includes(type))inventory();
@@ -35,7 +35,7 @@
     if(type==='paste')document.getElementById('status').textContent='已貼上副本';
     const projectMessages={'project-save':'專案已儲存於此瀏覽器','project-saved-load':'已載入本機存檔','project-import':'JSON 專案匯入完成','project-export':'JSON 專案已匯出','png-export':'完整工作區 PNG 已匯出','project-load':'專案資料已載入'};
     if(projectMessages[type])document.getElementById('status').textContent=projectMessages[type];
-    if(P.ui.mode==='select')document.getElementById('canvas-help').textContent='空白處拖曳框選 · Shift 點擊多選 · Ctrl+C / Ctrl+V 複製貼上 · Delete 刪除';
+    if(P.ui.mode==='select')document.getElementById('canvas-help').textContent='選取圖形後拖曳上方圓點旋轉 · 空白處拖曳框選 · Shift 點擊多選 · Ctrl+C / Ctrl+V 複製貼上 · Delete 刪除';
   }
   function setTab(tab){P.ui.tab=tab;document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));['architecture','placement','checks'].forEach(t=>document.getElementById(t+'-view').hidden=t!==tab);const titles={architecture:['System architecture','Logical component overview'],placement:['Virtual placement','Shared architecture inventory'],checks:['Engineering design check','Rule evaluation · Phase 4']};document.getElementById('view-title').textContent=titles[tab][0];document.getElementById('view-subtitle').textContent=titles[tab][1];document.querySelector('.toolbar-actions').hidden=tab!=='architecture';if(tab==='placement')inventory();status();}
   document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{P.notify('tab');setTab(b.dataset.tab);}));
@@ -45,7 +45,8 @@
   document.getElementById('text-mode').addEventListener('click',()=>P.setMode('text'));
   document.getElementById('pan-mode').addEventListener('click',()=>P.setMode('pan'));
   document.getElementById('dismiss-warning').addEventListener('click',()=>{P.ui.warning='';status();});
-  document.getElementById('add-block').addEventListener('click',()=>P.addAtCenter('Generic Block'));
+  const addBlock=document.getElementById('add-block');addBlock.textContent='＋ 方形';addBlock.addEventListener('click',()=>P.addAtCenter('Generic Block'));
+  for(const [id,label,shape] of [['add-diamond','＋ 菱形','diamond'],['add-triangle','＋ 三角形','triangle'],['add-circle','＋ 圓形','circle']]){const button=document.createElement('button');button.id=id;button.textContent=label;button.addEventListener('click',()=>P.addAtCenter('Generic Block',{shape}));addBlock.after(button);}
   document.getElementById('delete').addEventListener('click',()=>P.removeSelected());
   document.getElementById('copy-selection').addEventListener('click',()=>P.copySelection());
   document.getElementById('paste-selection').addEventListener('click',()=>P.pasteSelection());
