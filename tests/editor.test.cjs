@@ -123,7 +123,7 @@ test('Library HTML drop adds a block and pending connections cancel on tab chang
   const drop=new E.w.MouseEvent('drop',{bubbles:true,cancelable:true,clientX:800,clientY:750});Object.defineProperty(drop,'dataTransfer',{value:{getData:()=> 'USB Hub'}});svg.dispatchEvent(drop);
   assert.equal(P.state.components.length,initial+1);assert.equal(P.component(P.ui.selected).name,'USB Hub');
   const source=d.querySelector(`[data-id="${P.ui.selected}"] .general`);pointer(source,'pointerdown');pointer(svg,'pointerup');assert.ok(P.connectionUI.isPending());
-  d.querySelector('[data-tab="placement"]').click();assert.equal(P.connectionUI.isPending(),false);assert.equal(d.querySelectorAll('.inventory-card').length,initial+1);
+  d.querySelector('[data-tab="placement"]').click();assert.equal(P.connectionUI.isPending(),false);assert.equal(d.querySelectorAll('#inventory tbody tr').length,initial+1);
   E.clean();
 });
 test('Add parallel connection creates independent selectable edges and respects port limits',()=>{
@@ -186,7 +186,7 @@ test('Clear canvas cancels safely or clears all objects and previews; editing wo
   assert.equal(d.querySelector('.free-line-preview').getAttribute('d'),'');assert.equal(d.querySelector('#connection-preview').getAttribute('d'),'');
   assert.equal(d.querySelector('#clear-canvas').disabled,true);assert.equal(d.querySelector('#delete').disabled,true);
   assert.equal(JSON.stringify({project:P.state.project,board:P.state.board,rules:P.state.rules}),settings);
-  d.querySelector('[data-tab="placement"]').click();assert.equal(d.querySelectorAll('.inventory-card').length,0);
+  d.querySelector('[data-tab="placement"]').click();assert.equal(d.querySelectorAll('#inventory tbody tr').length,0);
   d.querySelector('[data-tab="architecture"]').click();d.querySelector('#add-block').click();assert.equal(P.state.components.length,1);assert.equal(d.querySelectorAll('.block').length,1);
   const a=P.state.components[0],b=P.addComponent('SDR',800,500);const edge=P.addConnection({componentId:a.id,portId:null,anchor:'right'},{componentId:b.id,portId:null,anchor:'left'});assert.ok(edge);assert.equal(d.querySelectorAll('.connection').length,1);
   const point=d.querySelector(`[data-id="${a.id}"] .general`);pointer(point,'pointerdown');pointer(svg,'pointerup');assert.equal(P.connectionUI.isPending(),true);
@@ -330,3 +330,204 @@ test('Text boxes create, edit, move, resize, copy, save and clear as first-class
 });
 
 
+
+test('Virtual IC placement preserves architecture, clamps geometry and round trips project data',()=>{
+  const E=editor(),{P,d,input}=E;
+  const original=JSON.stringify(P.state.components);
+  d.querySelector('[data-tab="placement"]').click();
+  d.querySelector('#place-all').click();
+  assert.equal(P.state.placements.length,P.state.components.length);
+  d.querySelector('#place-all').click();
+  assert.equal(P.state.placements.length,P.state.components.length);
+  assert.equal(d.querySelectorAll('.pcb-chip').length,P.state.components.length);
+  assert.ok(d.querySelectorAll('#pcb-nets line').length>0);
+  const p=P.state.placements.at(-1);
+  input(d.querySelector('#placement-editor input'),'999','change');
+  assert.equal(p.x,P.state.board.width-p.width);
+  const rotate=[...d.querySelectorAll('#placement-editor button')].find(b=>b.textContent==='旋轉 90°');rotate.click();
+  assert.equal(p.rotation,90);
+  const pcb=d.querySelector('#pcb-canvas');
+  pcb.getBoundingClientRect=()=>({left:0,top:0,width:170,height:110});
+  pcb.setPointerCapture=()=>{};
+  E.pointer(d.querySelector(`#pcb-canvas [data-component="${p.componentId}"]`),'pointerdown',p.x+7,p.y+7);
+  E.pointer(pcb,'pointermove',25,35);E.pointer(pcb,'pointerup',25,35);
+  assert.equal(p.x,18);assert.equal(p.y,28);
+  input(d.querySelector('#board-width'),'20','input');
+  input(d.querySelector('#board-height'),'20','input');d.querySelector('#apply-board').click();
+  assert.equal(P.state.board.width,20);
+  assert.ok(P.state.placements.every(p=>p.x+P.placement.size(p).w<=20&&p.y+P.placement.size(p).h<=20));
+  assert.match(d.querySelector('#placement-message').textContent,/重疊/);
+  assert.equal(JSON.stringify(P.state.components),original);
+  const saved=JSON.stringify(P.state);assert.equal(P.importProjectText(saved),true);
+  assert.equal(JSON.stringify(P.state),saved);
+  const invalid=JSON.parse(saved);invalid.placements[0].width=-1;
+  assert.equal(P.importProjectText(JSON.stringify(invalid)),false);
+  assert.equal(JSON.stringify(P.state),saved);
+  P.select(P.state.placements[0].componentId);P.removeSelected();
+  assert.equal(P.state.placements.length,P.state.components.length);
+  P.clearCanvas();assert.equal(d.querySelectorAll('.pcb-chip').length,0);
+  E.clean();
+});
+test('Architecture IC dimensions drive placement, area, copy and legacy migration',()=>{
+  const E=editor(),{P,d,input,field}=E;
+  const c=P.state.components[0];P.select(c.id);
+  input(field('IC 長 (mm)'),'18.5','change');input(field('IC 寬 (mm)'),'9.2','change');
+  assert.equal(c.icWidth,18.5);assert.equal(c.icHeight,9.2);
+  assert.equal(field('IC 面積 (mm²)').value,'170.2');
+  P.placement.place(c.id);const p=P.state.placements[0];
+  assert.equal(p.width,18.5);assert.equal(p.height,9.2);
+  p.rotation=90;p.x=150;
+  input(field('IC 寬 (mm)'),'20','change');
+  assert.equal(p.height,20);assert.equal(p.x,140);
+  assert.equal(P.update(c.id,{icWidth:101},'ic-size'),false);
+  assert.equal(c.icWidth,18.5);assert.equal(p.width,18.5);
+  assert.equal(P.update(c.id,{icWidth:NaN},'ic-size'),false);
+  P.copySelection();P.pasteSelection();assert.equal(P.component(P.ui.selected).icHeight,20);
+  d.querySelector('[data-tab="placement"]').click();
+  d.querySelector('#inventory button').click();
+  const fields=[...d.querySelectorAll('#placement-editor input')];
+  assert.equal(fields[2].readOnly,true);assert.equal(fields[2].value,'18.5');
+  const saved=JSON.stringify(P.state);assert.equal(P.importProjectText(saved),true);
+  assert.equal(JSON.stringify(P.state),saved);
+  const legacy=JSON.parse(saved);for(const c of legacy.components){delete c.icWidth;delete c.icHeight;}
+  assert.equal(P.importProjectText(JSON.stringify(legacy)),true);
+  assert.equal(P.component(c.id).icWidth,18.5);assert.equal(P.component(c.id).icHeight,20);
+  E.clean();
+});
+test('3D IC height, board thickness, camera controls and old project defaults',()=>{
+  const E=editor(),{P,d,input,field,pointer,key}=E;const c=P.state.components[0];P.select(c.id);
+  input(field('IC 長 (mm)'),'20','change');input(field('IC 寬 (mm)'),'10','change');input(field('IC 高 (mm)'),'7.5','change');
+  assert.equal(c.icThickness,7.5);assert.equal(field('IC 面積 (mm²)').value,'200');
+  assert.equal(P.update(c.id,{icThickness:-1}),false);
+  d.querySelector('[data-tab="placement"]').click();P.placement.place(c.id);
+  const svg=d.querySelector('#pcb-3d');assert.equal(svg.hasAttribute('hidden'),false);
+  assert.equal(svg.querySelectorAll('polygon').length,24);
+  assert.match(d.querySelector('#height-summary').textContent,/9.1 mm/);
+  input(d.querySelector('#board-thickness'),'2.4');d.querySelector('#apply-board').click();
+  assert.equal(P.state.board.thickness,2.4);assert.match(d.querySelector('#height-summary').textContent,/9.9 mm/);
+  const before=svg.querySelector('polygon').getAttribute('points'),state=JSON.stringify(P.state);
+  svg.setPointerCapture=()=>{};pointer(svg,'pointerdown',10,10);pointer(svg,'pointermove',60,40);pointer(svg,'pointerup',60,40);
+  assert.notEqual(svg.querySelector('polygon').getAttribute('points'),before);assert.equal(JSON.stringify(P.state),state);
+  const bounds=svg.getAttribute('viewBox');key(svg,'+');assert.notEqual(svg.getAttribute('viewBox'),bounds);
+  d.querySelector('#view-top').click();assert.equal(svg.hasAttribute('hidden'),true);assert.equal(d.querySelector('#pcb-canvas').hasAttribute('hidden'),false);
+  d.querySelector('#view-3d').click();assert.equal(svg.hasAttribute('hidden'),false);
+  const saved=JSON.stringify(P.state);P.clearCanvas();assert.equal(P.importProjectText(saved),true);
+  assert.equal(P.component(c.id).icThickness,7.5);assert.equal(P.state.board.thickness,2.4);
+  const legacy=JSON.parse(saved);delete legacy.board.thickness;for(const c of legacy.components)delete c.icThickness;
+  assert.equal(P.importProjectText(JSON.stringify(legacy)),true);assert.equal(P.state.board.thickness,1.6);assert.equal(P.component(c.id).icThickness,1.5);
+  const invalid=JSON.parse(saved);invalid.board.thickness=-2;assert.equal(P.importProjectText(JSON.stringify(invalid)),false);
+  E.clean();
+});
+test('3D board never paints over IC top surfaces at different board positions and camera angles',()=>{
+  const E=editor(),{P,d,pointer}=E;P.clearCanvas();
+  const c=P.addComponent('CPU');P.placement.place(c.id);
+  d.querySelector('[data-tab="placement"]').click();
+  d.querySelector('#show-ratsnest').checked=false;
+  const svg=d.querySelector('#pcb-3d');svg.setPointerCapture=()=>{};
+  const placement=P.state.placements[0];
+  function contains(poly,point){
+    const ps=poly.getAttribute('points').split(' ').map(p=>p.split(',').map(Number));let inside=false;
+    for(let i=0,j=ps.length-1;i<ps.length;j=i++){
+      const [x,y]=ps[i],[X,Y]=ps[j];
+      if((y>point.y)!==(Y>point.y)&&point.x<(X-x)*(point.y-y)/(Y-y)+x)inside=!inside;
+    }
+    return inside;
+  }
+  for(const [x,y] of [[4,4],[140,4],[4,80],[140,80]]){
+    placement.x=x;placement.y=y;
+    for(const yaw of [-2.5,-1,0,1,2.5])for(const tilt of [-1.3,-.4,.4,1.3]){
+      d.querySelector('#reset-3d').click();
+      pointer(svg,'pointerdown',0,0);pointer(svg,'pointermove',(yaw+.55)*100,(tilt-1.05)*100);pointer(svg,'pointerup',(yaw+.55)*100,(tilt-1.05)*100);
+      const center=P.pcb3d.project(x+6,y+6,P.state.board.thickness+c.icThickness);
+      const covering=[...svg.querySelectorAll('polygon')].filter(poly=>contains(poly,center));
+      assert.ok(covering.length>0);
+      assert.equal(covering.at(-1).closest('[data-component]')?.dataset.component,c.id,`IC at ${x},${y}, yaw ${yaw}, tilt ${tilt} must remain visible`);
+      assert.equal(svg.firstElementChild.dataset.layer,'board');
+    }
+  }
+  E.clean();
+});
+test('IC packages persist and SOT pins are even, symmetric and rotate with the body',()=>{
+  const E=editor(),{P,d,input,field}=E;const c=P.state.components[0];P.select(c.id);
+  assert.equal(c.icPackage,'QFN');
+  input(field('IC 封裝'),'SOT','change');assert.equal(c.icPackage,'SOT');
+  input(field('SOT 總 PIN 腳數'),'10','change');assert.equal(c.icPinCount,10);
+  assert.match(d.querySelector('#properties-content').textContent,/左側 5 腳 · 右側 5 腳/);
+  input(field('SOT 總 PIN 腳數'),'7','change');assert.equal(c.icPinCount,10);
+  assert.equal(field('SOT 總 PIN 腳數').checkValidity(),false);
+  for(const n of [0,3,65,4.5,NaN])assert.equal(P.update(c.id,{icPinCount:n}),false);
+  assert.equal(P.update(c.id,{icPackage:'UNKNOWN'}),false);
+  const {pads}=P.icGeometry(c);assert.equal(pads.length,10);
+  for(let i=0;i<pads.length;i+=2){assert.equal(pads[i].y,pads[i+1].y);assert.ok(Math.abs(pads[i].x+pads[i+1].x+pads[i].w-c.icWidth)<1e-9);}
+  for(const rotation of [0,90,180,270])for(const pad of pads){const r=P.icRect(pad,c,rotation),w=rotation%180?c.icHeight:c.icWidth,h=rotation%180?c.icWidth:c.icHeight;assert.ok(r.x>=0&&r.y>=0&&r.x+r.w<=w+1e-9&&r.y+r.h<=h+1e-9);}
+  d.querySelector('[data-tab="placement"]').click();P.placement.place(c.id);
+  assert.equal(d.querySelectorAll('#pcb-canvas .pcb-lead').length,10);
+  assert.equal(d.querySelectorAll('#pcb-3d .pcb-lead').length,60);
+  P.copySelection();P.pasteSelection();assert.equal(P.component(P.ui.selected).icPackage,'SOT');assert.equal(P.component(P.ui.selected).icPinCount,10);
+  const saved=JSON.stringify(P.state);assert.equal(P.importProjectText(saved),true);assert.equal(JSON.stringify(P.state),saved);
+  const invalid=JSON.parse(saved);invalid.components[0].icPinCount=9;assert.equal(P.importProjectText(JSON.stringify(invalid)),false);
+  const legacy=JSON.parse(saved);for(const c of legacy.components){delete c.icPackage;delete c.icPinCount;}
+  assert.equal(P.importProjectText(JSON.stringify(legacy)),true);assert.equal(P.component(c.id).icPackage,'QFN');
+  P.select(c.id);input(field('IC 封裝'),'BGA','change');assert.equal(c.icPackage,'SOT');assert.equal(P.component(c.id).icPackage,'BGA');assert.equal(field('SOT 總 PIN 腳數'),undefined);
+  E.clean();
+});
+test('PCB resize preserves input drafts and applies board area with bounded placements',()=>{
+  const E=editor(),{P,d,input}=E;P.clearCanvas();const c=P.addComponent('CPU');
+  d.querySelector('[data-tab="placement"]').click();P.placement.place(c.id);
+  const p=P.state.placements[0];p.x=140;p.y=80;
+  input(d.querySelector('#board-width'),'50');input(d.querySelector('#board-height'),'50');
+  P.notify('selection');assert.equal(d.querySelector('#board-width').value,'50');assert.equal(d.querySelector('#board-height').value,'50');
+  d.querySelector('#apply-board').click();
+  assert.equal(P.state.board.width,50);assert.equal(P.state.board.height,50);
+  assert.equal(d.querySelector('#pcb-board').getAttribute('width'),'50');
+  assert.equal(p.x,38);assert.equal(p.y,38);assert.match(d.querySelector('#board-message').textContent,/2500 mm²/);
+  input(d.querySelector('#board-width'),'10');d.querySelector('#apply-board').click();
+  assert.equal(P.state.board.width,50);assert.match(d.querySelector('#board-message').textContent,/容納/);
+  assert.equal(d.querySelector('#board-width').value,'10');
+  E.clean();
+});
+test('Bottom placements filter by face, avoid cross-face collisions and render below the PCB',()=>{
+  const E=editor(),{P,d,input}=E;P.clearCanvas();
+  const top=P.addComponent('CPU',0,0,{icThickness:4}),bottom=P.addComponent('DDR',0,0,{icThickness:3});
+  d.querySelector('[data-tab="placement"]').click();P.placement.place(top.id);
+  input(d.querySelector('#placement-side'),'bottom','change');P.placement.place(bottom.id);
+  const a=P.state.placements[0],b=P.state.placements[1];Object.assign(a,{x:10,y:10});Object.assign(b,{x:10,y:10});P.notify('placement-update');
+  assert.equal(b.side,'bottom');assert.equal(d.querySelectorAll('#pcb-canvas .pcb-chip').length,1);
+  assert.equal(d.querySelector('#pcb-canvas .pcb-chip').dataset.component,bottom.id);
+  assert.match(d.querySelector('#placement-message').textContent,/無元件重疊/);
+  assert.match(d.querySelector('#height-summary').textContent,/8.6 mm/);
+  const svg=d.querySelector('#pcb-3d');
+  assert.equal(svg.firstElementChild.querySelector('[data-component]').dataset.component,bottom.id);
+  d.querySelector('#look-bottom').click();
+  assert.equal(svg.lastElementChild.querySelector('[data-component]').dataset.component,bottom.id);
+  assert.equal(svg.firstElementChild.querySelector('[data-component]').dataset.component,top.id);
+  assert.ok([...svg.lastElementChild.querySelectorAll('text')].some(n=>n.textContent==='DDR'));
+  d.querySelector('#reset-3d').click();assert.equal(svg.lastElementChild.querySelector('[data-component]').dataset.component,top.id);
+  input(d.querySelector('#selected-placement-side'),'top','change');assert.equal(b.side,'top');
+  assert.match(d.querySelector('#placement-message').textContent,/2 顆元件重疊/);
+  input(d.querySelector('#selected-placement-side'),'bottom','change');
+  const saved=JSON.stringify(P.state);assert.equal(P.importProjectText(saved),true);assert.equal(JSON.stringify(P.state),saved);
+  const invalid=JSON.parse(saved);invalid.placements[0].side='invalid';assert.equal(P.importProjectText(JSON.stringify(invalid)),false);
+  const legacy=JSON.parse(saved);legacy.placements.forEach(p=>delete p.side);assert.equal(P.importProjectText(JSON.stringify(legacy)),true);assert.ok(P.state.placements.every(p=>p.side==='top'));
+  E.clean();
+});
+test('Per-component TOP/Bottom actions place or move exactly one IC and reveal its face',()=>{
+  const E=editor(),{P,d}=E;P.clearCanvas();const a=P.addComponent('CPU'),b=P.addComponent('DDR');
+  d.querySelector('[data-tab="placement"]').click();
+  const row=id=>[...d.querySelectorAll('#inventory tbody tr')].find(r=>r.dataset.componentId===id);
+  assert.equal(d.querySelectorAll('#inventory tbody tr').length,2);assert.equal(P.state.placements.length,0);
+  assert.equal(row(a.id).querySelector('.placement-side-status').textContent,'未擺放');
+  row(a.id).querySelector('[data-place-side="bottom"]').click();
+  const p=P.state.placements[0];assert.equal(p.componentId,a.id);assert.equal(p.side,'bottom');assert.equal(d.querySelector('#placement-side').value,'bottom');
+  assert.equal(d.querySelector('#pcb-canvas').hasAttribute('hidden'),false);assert.equal(d.querySelectorAll('#pcb-canvas .pcb-chip').length,1);
+  row(b.id).querySelector('[data-place-side="top"]').click();assert.equal(P.state.placements.length,2);assert.equal(P.state.placements[1].side,'top');
+  Object.assign(p,{x:20,y:25,rotation:90});const id=p.id;
+  row(a.id).querySelector('[data-place-side="top"]').click();
+  assert.equal(P.state.placements.length,2);assert.equal(p.id,id);assert.equal(p.x,20);assert.equal(p.y,25);assert.equal(p.rotation,90);assert.equal(p.side,'top');
+  assert.equal(row(a.id).querySelector('[data-place-side="top"]').getAttribute('aria-pressed'),'true');
+  assert.equal(d.querySelectorAll('#pcb-canvas .pcb-chip').length,2);
+  row(a.id).querySelector('[data-place-side="top"]').click();assert.equal(P.state.placements.length,2);
+  const huge=P.addComponent('FPGA',0,0,{icWidth:200});row(huge.id).querySelector('[data-place-side="bottom"]').click();assert.equal(P.state.placements.length,2);assert.match(d.querySelector('#placement-message').textContent,/超出/);
+  assert.ok(d.querySelector('#inventory').compareDocumentPosition(d.querySelector('.pcb-wrap'))&E.w.Node.DOCUMENT_POSITION_FOLLOWING);
+  E.clean();
+});
