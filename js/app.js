@@ -10,7 +10,7 @@
   library();document.getElementById('search').addEventListener('input',e=>library(e.target.value));
   list.addEventListener('dragstart',e=>{const item=e.target.closest('[data-name]');if(!item)return;e.dataTransfer.setData('application/x-stratum-component',item.dataset.name);e.dataTransfer.effectAllowed='copy';});
   list.addEventListener('click',e=>{const item=e.target.closest('[data-name]');if(!item)return;setTab('architecture');P.addAtCenter(item.dataset.name);});
-  function inventory(){const target=document.getElementById('inventory');target.replaceChildren();P.state.components.forEach(c=>{const card=document.createElement('div');card.className='inventory-card';const name=document.createElement('strong');name.textContent=c.name;const detail=document.createElement('small');detail.textContent=c.category+' · Unplaced';card.append(name,detail);target.append(card);});document.getElementById('inventory-count').textContent=` / ${P.state.components.length} UNPLACED`;}
+  function inventory(){P.placement.render();}
   function status({type}={}){
     const c=P.component(P.ui.selected),edge=P.connection(P.ui.selected),line=P.line(P.ui.selected),box=P.textBox(P.ui.selected);
     document.getElementById('component-count').textContent=`${P.state.components.length} nodes · ${P.state.connections.length} edges · ${P.state.lines.length} lines · ${P.state.textBoxes.length} text`;

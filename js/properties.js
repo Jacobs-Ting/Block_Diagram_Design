@@ -8,13 +8,13 @@
     if(options.choices)for(const choice of options.choices){const [v,label]=Array.isArray(choice)?choice:[choice,choice];const option=document.createElement('option');option.value=v;option.textContent=label;input.append(option);}
     else if(!options.multiline)input.type=options.color?'color':options.number?'number':'text';
     input.value=value??'';if(options.name)input.name=options.name;
-    if(options.number){input.min=options.min??0;if(options.max!==undefined)input.max=options.max;input.step=1;}else input.maxLength=options.multiline?2000:120;
+    if(options.number){input.min=options.min??0;if(options.max!==undefined)input.max=options.max;input.step=options.step??1;}else input.maxLength=options.multiline?2000:120;
     if(options.readonly)input.readOnly=true;
     if(options.placeholder)input.placeholder=options.placeholder;
     input.addEventListener(options.commit?'change':'input',()=>{
       let value=input.value;
       if(options.required&&!value.trim()){input.setCustomValidity('A value is required.');return;}
-      if(options.number){if(value===''&&options.nullable)value=null;else {value=Number(value);if(input.value===''||!Number.isFinite(value)||value<Number(input.min)||(input.max&&value>Number(input.max))||!Number.isInteger(value)){input.setCustomValidity(`Enter a whole number from ${input.min}${input.max?' to '+input.max:''}.`);return;}}}
+      if(options.number){if(value===''&&options.nullable)value=null;else {value=Number(value);if(input.value===''||!Number.isFinite(value)||value<Number(input.min)||(input.max&&value>Number(input.max))||(options.step===undefined&&!Number.isInteger(value))){input.setCustomValidity(`Enter a whole number from ${input.min}${input.max?' to '+input.max:''}.`);return;}}}
       input.setCustomValidity('');onChange?.(value,input);
     });
     wrapper.append(input);parent.append(wrapper);return input;
@@ -86,6 +86,31 @@
       const input=field(panel,label,c[key],value=>{P.update(c.id,{[key]:value});if(key==='name')header.querySelector('h2').textContent=value;if(key==='category')header.querySelector('.chip-icon').textContent=P.icons[value];},{name:key,required:key==='name',choices:key==='category'?Object.keys(P.groups):null});
       input.addEventListener('blur',()=>{if(key==='name'&&!input.value.trim()){input.value=c.name;input.setCustomValidity('');}});
     }
+    panel.append(text('h3','section-title','IC 封裝'));
+    field(panel,'IC 封裝',c.icPackage,value=>{P.update(c.id,{icPackage:value},'ic-package');render();},{name:'icPackage',commit:true,choices:['QFN','BGA','SOT']});
+    if(c.icPackage==='SOT'){
+      const pinInput=field(panel,'SOT 總 PIN 腳數',c.icPinCount,(value,input)=>{
+        const ok=P.update(c.id,{icPinCount:value},'ic-package');
+        input.setCustomValidity(ok?'':'請輸入 2–64 的偶數，左右各分配一半腳位。');
+        if(!ok){input.reportValidity();return;}
+        summary.textContent=`左側 ${value/2} 腳 · 右側 ${value/2} 腳（總計 ${value} 腳）`;
+      },{name:'icPinCount',number:true,min:2,max:64,step:2,commit:true});
+      pinInput.addEventListener('blur',()=>{pinInput.value=c.icPinCount;pinInput.setCustomValidity('');});
+      const summary=text('p','inspector-note',`左側 ${c.icPinCount/2} 腳 · 右側 ${c.icPinCount/2} 腳（總計 ${c.icPinCount} 腳）`);panel.append(summary);
+    }
+    panel.append(text('h3','section-title','IC 實體尺寸 / PLACEMENT'));
+    const icSizes=text('div','field-row','');
+    const area=field(document.createElement('div'),'IC 面積 (mm²)',Number((c.icWidth*c.icHeight).toFixed(4)),null,{name:'icArea',readonly:true});
+    for(const [key,label] of [['icWidth','IC 長 (mm)'],['icHeight','IC 寬 (mm)'],['icThickness','IC 高 (mm)']]){
+      const input=field(icSizes,label,c[key],(value,input)=>{
+        const ok=P.update(c.id,{[key]:value},'ic-size');
+        input.setCustomValidity(ok?'':'IC 尺寸超出目前電路板，請先增加板尺寸。');
+        if(!ok){input.reportValidity();return;}
+        area.value=Number((c.icWidth*c.icHeight).toFixed(4));
+      },{name:key,number:true,min:key==='icThickness'?0.1:1,max:1000,step:0.1,commit:true});
+      input.addEventListener('blur',()=>{input.value=c[key];input.setCustomValidity('');});
+    }
+    panel.append(icSizes,area.parentElement,text('p','inspector-note','面積 = 長 × 寬；Placement 的 3D IC 使用相同長、寬、高（mm）。下方 Width / Height 僅控制架構圖方塊大小。'));
     field(panel,'形狀',c.shape||'rectangle',value=>P.update(c.id,{shape:value}),{choices:[['rectangle','方形'],['circle','圓形'],['triangle','三角形'],['diamond','菱形']]});
     const min=P.minimumSize(c.id),sizes=text('div','field-row','');
     for(const key of ['width','height']){

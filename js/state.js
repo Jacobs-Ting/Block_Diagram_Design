@@ -6,7 +6,7 @@
   P.fonts = ['Segoe UI','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Courier New','Consolas'];
   P.shapes = ['rectangle','circle','triangle','diamond'];
   P.interfaceColors = {Digital:'#96adca',PCIe:'#83acff',USB:'#af9dfa',SPI:'#78c6dc',I2C:'#78c6dc',UART:'#98b8cc',GPIO:'#98b8cc',MIPI:'#d1a5ef',SerDes:'#83acff',Ethernet:'#79d4ca',RF:'#61d3b3',Clock:'#e6c57d',Power:'#ed9b79',Ground:'#9da8b4',Analog:'#d996bd'};
-  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,unit:'mm'},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
+  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,thickness:1.6,unit:'mm'},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
   P.ui = {tab:'architecture',selected:null,selectedKind:null,snap:true,mode:'select'};
   const listeners = new Set();
   P.subscribe = fn => {listeners.add(fn);return()=>listeners.delete(fn);};
@@ -23,7 +23,7 @@
   };
   P.addComponent = (name,x=70,y=100,extra={}) => {
     const template=P.library.find(c=>c.name===name)||{name,category:'Other'};
-    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,minWidth:180,minHeight:112,...extra,id:P.uuid()};
+    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,...extra,id:P.uuid()};
     P.state.components.push(c);P.notify('add',c.id);return c;
   };
   P.ui.selection=[];
@@ -78,6 +78,17 @@
     if('fontFamily' in next&&!P.fonts.includes(next.fontFamily))return false;
     if('fontSize' in next&&(!Number.isFinite(next.fontSize)||next.fontSize<8||next.fontSize>48))return false;
     if('shape' in next&&!P.shapes.includes(next.shape))return false;
+    for(const key of ['icWidth','icHeight'])if(key in next&&(!Number.isFinite(next[key])||next[key]<1||next[key]>1000))return false;
+    if('icPackage' in next&&!['QFN','BGA','SOT'].includes(next.icPackage))return false;
+    if('icPinCount' in next&&(!Number.isInteger(next.icPinCount)||next.icPinCount<2||next.icPinCount>64||next.icPinCount%2!==0))return false;
+    if('icThickness' in next&&(!Number.isFinite(next.icThickness)||next.icThickness<0.1||next.icThickness>1000))return false;
+    const placement=P.state.placements.find(p=>p.componentId===id);
+    if(placement&&('icWidth' in next||'icHeight' in next)){
+      const width=next.icWidth??c.icWidth,height=next.icHeight??c.icHeight;
+      const w=placement.rotation%180?height:width,h=placement.rotation%180?width:height;
+      if(w>P.state.board.width||h>P.state.board.height)return false;
+      Object.assign(placement,{width,height,x:Math.max(0,Math.min(placement.x,P.state.board.width-w)),y:Math.max(0,Math.min(placement.y,P.state.board.height-h))});
+    }
     const min=P.minimumSize(id);
     if('width' in next)next.width=Math.max(min.width,next.width);
     if('height' in next)next.height=Math.max(min.height,next.height);
