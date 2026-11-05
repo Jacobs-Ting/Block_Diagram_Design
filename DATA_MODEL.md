@@ -86,6 +86,9 @@ Geometry 不依賴 DOM，可供 Placement、檢查或匯出重用。分析程式
 
 ### Three-dimensional placement
 
-Component `icWidth` is the physical X length (UI: IC 長), `icHeight` is the physical Y width (UI: IC 寬), and `icThickness` is physical Z height (UI: IC 高), all in mm. The first two names are retained for compatibility with previous footprint data. `board.thickness` is the PCB Z thickness in mm. Defaults are 12 × 12 × 1.5 mm for ICs and 1.6 mm board thickness. Placement width/height mirror component X/Y dimensions; rotation swaps footprint X/Y extents but does not change Z height. ICs stand on the top board surface at Z = board.thickness; board bottom is Z = 0. Camera orientation and zoom are view state and do not alter geometry.
+Component `icWidth` is the physical X length (UI: IC 長), `icHeight` is the physical Y width (UI: IC 寬), and `icThickness` is physical Z height (UI: IC 高), all in mm. The first two names are retained for compatibility with previous footprint data. `board.thickness` is the PCB Z thickness in mm. Defaults are 12 × 12 × 1.5 mm for ICs and 1.6 mm board thickness. Placement width/height mirror component X/Y dimensions; rotation swaps footprint X/Y extents but does not change Z height. Top ICs stand on the board surface at Z = board.thickness; Bottom ICs extend from Z = -icThickness to Z = 0. Board bottom is Z = 0. Camera orientation and zoom are view state and do not alter geometry.
 
 Component `icPackage` is `QFN`, `BGA` or `SOT` (default `QFN`); `icPinCount` is an even integer in 2–64 (default 6), used for SOT only and retained when switching packages. SOT leads are evenly spaced along the two local X edges, half on each side, and follow placement rotation. Component dimensions remain the overall envelope including leads.
+
+
+Placement `side` is `top` or `bottom` (legacy default `top`). Both faces use the same board XY reference; opposite-face overlap is permitted. Total system height = max Top IC height + board.thickness + max Bottom IC height. Camera tilt supports above- and below-board views; rendering paints the far mounting face, then board, then near mounting face to preserve board occlusion.

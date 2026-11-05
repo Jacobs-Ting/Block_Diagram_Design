@@ -131,8 +131,16 @@ Placement changes preserve the logical diagram. Project save/load and JSON impor
 Sizes and drawn pads are illustrative planning geometry, not manufacturer packages or verified pin assignments.
 
 
-Placement opens in **3D 旋轉檢視**. Drag to rotate the board, use the mouse wheel to zoom, or focus the view and use arrow keys and +/−. Click a solid to select its component. **俯視擺件** retains the drag-to-place editor; **重設視角** restores the default camera. Set **板厚 mm** and apply board dimensions to update the board solid. The height summary reports the tallest placed IC and the total height from the bottom of the board to the top of that IC (board thickness + tallest IC). All ICs mount on the top surface.
+Placement opens in **3D 旋轉檢視**. Drag to rotate the board, use the mouse wheel to zoom, or focus the view and use arrow keys and +/−. Click a solid to select its component. **俯視擺件** retains the drag-to-place editor; **重設視角** restores the default camera. Set **板厚 mm** and apply board dimensions to update the board solid. The height summary reports the tallest IC on each face and the total system height (tallest Top IC + board thickness + tallest Bottom IC).
 
 IC 高 is the physical Z height; older IC footprint dimensions remain the length and width, preserving existing placement layouts. Older files default to 1.5 mm IC height and 1.6 mm board thickness. These values persist through local save/load, copy/paste, and JSON export/import.
 
 Architecture properties include **IC 封裝** with QFN, BGA and SOT options. SOT exposes **SOT 總 PIN 腳數**, accepting even integers from 2 to 64 (default 6), with half on each side. Placement top and 3D views show the symmetric SOT leads and rotate them with the component. Configured IC dimensions include the lead envelope; the SOT body is inset within it. Package information persists in copy/paste and project files; older projects default to QFN. These planning leads do not assign engineering ports to physical pins.
+
+
+Use **擺放面** to choose Top or Bottom before adding ICs. The selected IC editor can move an existing component to the other side. The 2D placement editor shows only the chosen face using a shared Top-reference XY coordinate system (Bottom is not mirrored); collisions are checked separately on each side. **查看 Bottom 3D** turns the camera underneath the board, and dragging can rotate between both sides. Bottom bodies extend below Z = 0; the PCB correctly occludes the far mounting face.
+
+Board width/height/thickness inputs retain uncommitted edits across view updates. Click **套用板尺寸** to apply them; the result or validation error appears immediately below the board controls. Shrinking the board moves placements within its boundaries; a board smaller than any individual rotated IC envelope is rejected. Input ranges are 10–1000 mm for width/height and 0.1–100 mm for thickness.
+
+
+The component list now appears above the Placement canvas and lists every Architecture component, its package/dimensions and current placement status. Each row has **放到 TOP** and **放到 Bottom** actions: unplaced ICs are created on the chosen side; existing ICs move to that side without changing their XY coordinates or rotation. Either action selects the IC and opens its face in the 2D placement editor. Clicking an already placed IC's name selects it. The upper face selector is a **俯視檢視面** filter, while the optional bulk action places only unplaced ICs on the current face.
