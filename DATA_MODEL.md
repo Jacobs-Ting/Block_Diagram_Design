@@ -82,3 +82,10 @@ Geometry 不依賴 DOM，可供 Placement、檢查或匯出重用。分析程式
 `ui.selection` 為 `{id, kind}` 陣列，kind 為 component / connection / line。單選時 `ui.selected` / `ui.selectedKind` 仍提供既有屬性面板相容性，多選改以數量摘要呈現。
 `copySelection` 保存深層快照，包括選取 Component 的 Port、內部 Connection 與明確選取的 Edge／Line。`pasteSelection` 重新配置 Component／Port／Edge／Line UUID，內部端點透過 ID map 重建；原有 Port 容量驗證照常執行。
 剪貼簿是工作階段 UI 資料，不加入 Project JSON。Placement／Zone 不隨 Architecture 複製。
+
+
+### Three-dimensional placement
+
+Component `icWidth` is the physical X length (UI: IC 長), `icHeight` is the physical Y width (UI: IC 寬), and `icThickness` is physical Z height (UI: IC 高), all in mm. The first two names are retained for compatibility with previous footprint data. `board.thickness` is the PCB Z thickness in mm. Defaults are 12 × 12 × 1.5 mm for ICs and 1.6 mm board thickness. Placement width/height mirror component X/Y dimensions; rotation swaps footprint X/Y extents but does not change Z height. ICs stand on the top board surface at Z = board.thickness; board bottom is Z = 0. Camera orientation and zoom are view state and do not alter geometry.
+
+Component `icPackage` is `QFN`, `BGA` or `SOT` (default `QFN`); `icPinCount` is an even integer in 2–64 (default 6), used for SOT only and retained when switching packages. SOT leads are evenly spaced along the two local X edges, half on each side, and follow placement rotation. Component dimensions remain the overall envelope including leads.

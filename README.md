@@ -120,3 +120,19 @@ node --test tests/*.test.cjs
 
 
 
+
+
+### Virtual IC placement
+
+Open **Placement** after creating your Block Diagram. Click an inventory item or **放入所有 IC** to create one planning footprint per block. Drag footprints on the PCB, edit X/Y in millimeters, rotate by 90°, or return a footprint to the inventory. Board dimensions are adjustable (10–1000 mm); placements stay inside the board. Red outlines identify overlapping footprints. Dashed lines follow the architecture connections and can be hidden.
+
+Placement changes preserve the logical diagram. Project save/load and JSON import/export include board dimensions and placements; deleting a block removes its footprint. Set **IC 長 (mm)**, **IC 寬 (mm)** and **IC 高 (mm)** in the Architecture component properties; **IC 面積 (mm²)** is calculated as length × width. Placement uses these same dimensions, including for existing footprints and 3D solids; edit physical dimensions in Architecture. Changes that cannot fit an already placed IC on the board are rejected. Older projects inherit IC dimensions from existing placements, or default to 12 × 12 mm.
+
+Sizes and drawn pads are illustrative planning geometry, not manufacturer packages or verified pin assignments.
+
+
+Placement opens in **3D 旋轉檢視**. Drag to rotate the board, use the mouse wheel to zoom, or focus the view and use arrow keys and +/−. Click a solid to select its component. **俯視擺件** retains the drag-to-place editor; **重設視角** restores the default camera. Set **板厚 mm** and apply board dimensions to update the board solid. The height summary reports the tallest placed IC and the total height from the bottom of the board to the top of that IC (board thickness + tallest IC). All ICs mount on the top surface.
+
+IC 高 is the physical Z height; older IC footprint dimensions remain the length and width, preserving existing placement layouts. Older files default to 1.5 mm IC height and 1.6 mm board thickness. These values persist through local save/load, copy/paste, and JSON export/import.
+
+Architecture properties include **IC 封裝** with QFN, BGA and SOT options. SOT exposes **SOT 總 PIN 腳數**, accepting even integers from 2 to 64 (default 6), with half on each side. Placement top and 3D views show the symmetric SOT leads and rotate them with the component. Configured IC dimensions include the lead envelope; the SOT body is inset within it. Package information persists in copy/paste and project files; older projects default to QFN. These planning leads do not assign engineering ports to physical pins.
