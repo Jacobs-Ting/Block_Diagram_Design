@@ -18,7 +18,7 @@
     const target=P.addPort(blocks['RF Transceiver'].id,{name,type,side:'left',direction:'input',maxConnections:1});
     P.addConnection(endpoint('SDR','right',source.id),endpoint('RF Transceiver','left',target.id),{interfaceType:type,label:name});
   }
-  const rfOut=P.addPort(blocks['RF Transceiver'].id,{name:'RF_OUT',type:'RF',side:'right',direction:'output',maxConnections:1});
+  const rfOut=P.componentPorts(blocks['RF Transceiver'].id).find(p=>p.rfKey==='tx:1');
   const rfIn=P.addPort(blocks.PA.id,{name:'RF_IN',type:'RF',side:'left',direction:'input',maxConnections:1});
   P.addConnection(endpoint('RF Transceiver','right',rfOut.id),endpoint('PA','left',rfIn.id),{label:'RF 3.5 GHz'});
   link('PA','RF Switch','bottom','top','RF','RF');link('RF Switch','Filter','right','left','RF','RF');link('Filter','Antenna','top','bottom','RF','RF');

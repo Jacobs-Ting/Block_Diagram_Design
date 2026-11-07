@@ -92,3 +92,24 @@ Component `icPackage` is `QFN`, `BGA` or `SOT` (default `QFN`); `icPinCount` is 
 
 
 Placement `side` is `top` or `bottom` (legacy default `top`). Both faces use the same board XY reference; opposite-face overlap is permitted. Total system height = max Top IC height + board.thickness + max Bottom IC height. Camera tilt supports above- and below-board views; rendering paints the far mounting face, then board, then near mounting face to preserve board occlusion.
+
+
+### RF / Link Budget
+
+TRX components (`type: RF Transceiver`) store `txChannels`, `rxChannels` (integers 1–4, default 1), `txPower` (DA output dBm), `rxGain` and `rxNf` (input LNA dB). PA uses `rfGain` (dB) and output `p1db` (dBm). LNA uses `rfGain`, `rfNf`. Filter/RF Switch/Duplexer use `rfLoss` (dB) and `maxInput` (dBm). Analog values default to null (unconfigured). Gain/power accept −100–100, NF/loss 0–100. Missing component fields migrate to these defaults; fields persist in project files and component copies.
+
+Connections store `loss` (0–100 dB, default 0), `rfMode` (`auto`, `tx`, `rx`, `both`; default auto), `txChannel`, `rxChannel` (1–4, default 1). Channel selection applies at TRX-adjacent edges; intermediate edges follow directed RF topology. These fields also survive connection copies.
+
+`state.linkBudget` stores `bandwidthMHz` (>0 to 100000; default 20) and `snrDb` (−100–100; default 10), shared by all Rx rows. Computed results are derived, not persisted. Each row identifies TRX/channel/path, status, warning list, stages and a numeric Tx max-power or Rx sensitivity only when the path and required data are complete. Results are referenced to the antenna feed and exclude air path loss/EIRP.
+
+
+Managed RF ports use `rfKey` = `tx:N`, `rx:N` or `rf:N`. TRX counts determine the `tx`/`rx` keys and direction; Switch `rfPortCount` (2–32) determines `rf` keys. Switch port `loss` and `maxLevel` are nullable numeric inputs in dB/dBm. Wire channel metadata is inferred on creation from managed TRX ports; calculation reads the actual port key. The switch is evaluated using the distinct incoming and outgoing wire port references in signal order, with one passive stage per port. Count changes preserve existing keys/UUIDs and reject removal of connected managed ports. Legacy untagged matching RF ports may be adopted during load.
+
+
+Current managed layout: `tx:N` and `rx:N` ports always use `side: right`. Switch `rfPortCount` is the left branch count (1–32), with keys `rf:1`…`rf:N` on the left, plus fixed key `rfc` / name `RFC` on the right. `rfPortLayout: common-v1` marks migrated/current switch data. Branch counts do not include RFC. Only branch-to-common and common-to-branch switch traversal is modeled; Loss and Max Level apply at both ports. Layout synchronization also updates connected endpoint anchor sides while preserving IDs.
+
+
+RF ports optionally store `signalMode: single | differential` (legacy undefined means single). TRX managed ports preserve this user-selectable field through count synchronization. Balun is a passive RF component with `rfLoss` / `maxInput` and managed keys `balanced` (left, differential) and `unbalanced` (right, single); their modes are fixed. Differential wires are inferred from endpoint modes for drawing, not duplicated as separate graph edges. Link Budget blocks endpoint-mode mismatches and counts Balun insertion loss once per traversal.
+
+
+Differential `connection.source` / `.target` endpoints optionally store `polarity: + | -`. A differential RF port is a shared logical channel with two independent SVG connection points and separate capacity accounting. Undefined polarity on legacy differential endpoints means +. Geometry allocates two positions to each differential port; a pair is deduplicated for RF path search and both physical edge IDs are retained for reporting. Pair matching requires identical directed source/target component/port IDs, opposite matching polarities, and consistent RF mode/loss. Each individual conductor is rendered as one line.

@@ -10,12 +10,13 @@
   }
   function points(c,g){
     const target=g.querySelector('.points');target.replaceChildren();
-    const endpoints=[...P.sides.map(anchor=>({componentId:c.id,portId:null,anchor})),...P.componentPorts(c.id).map(p=>({componentId:c.id,portId:p.id,anchor:p.side}))];
+    const endpoints=[...P.sides.map(anchor=>({componentId:c.id,portId:null,anchor})),...P.componentPorts(c.id).flatMap(p=>(p.signalMode==='differential'?['+','-']:[null]).map(polarity=>({componentId:c.id,portId:p.id,anchor:p.side,...(polarity?{polarity}:{})})))];
     for(const end of endpoints){
-      const port=P.port(end.portId),node=element('g',{class:'connection-point '+(port?'engineering':'general'),'data-component-id':c.id,'data-port-id':end.portId||'','data-side':end.anchor,tabindex:0,role:'button','aria-label':`${c.name}: ${port?.name||end.anchor+' general connection'}`});
+      const port=P.port(end.portId),node=element('g',{class:'connection-point '+(port?'engineering':'general'),'data-component-id':c.id,'data-port-id':end.portId||'','data-side':end.anchor,'data-polarity':end.polarity||'',tabindex:0,role:'button','aria-label':`${c.name}: ${port?port.name+(end.polarity||''):end.anchor+' general connection'}`});
       node.append(element('circle',{class:'point-hit',r:12}),port?element('rect',{class:'point-dot',x:-5,y:-5,width:10,height:10,rx:2}):element('circle',{class:'point-dot',r:5}),element('title'));
       node.style.setProperty('--port-color',port?P.interfaceColors[port.type]:'#b3c3d3');
-      node.querySelector('title').textContent=port?`${port.name} · ${port.type} · ${port.direction} · ${P.portUsage(port.id)} / ${port.maxConnections??'∞'} connections`:`${end.anchor} · General connection · Unlimited`;
+      node.querySelector('title').textContent=port?`${port.name}${end.polarity||''} · ${port.type} · ${port.direction} · ${P.portUsage(port.id,end.polarity)} / ${port.maxConnections??'∞'} connections`:`${end.anchor} · General connection · Unlimited`;
+      if(port?.rfKey){const side=port.side;node.append(element('text',{class:'rf-port-label',x:side==='left'?-10:side==='right'?10:0,y:side==='top'?-10:side==='bottom'?17:3,'text-anchor':side==='left'?'end':side==='right'?'start':'middle','font-size':10,fill:P.interfaceColors.RF,'pointer-events':'none'}));node.querySelector('.rf-port-label').textContent=(port.rfKey==='balanced'?'BAL':port.name)+(end.polarity||'');}
       target.append(node);
     }
   }
@@ -30,9 +31,9 @@
     for(const node of g.querySelectorAll('.connection-point')){
       const end=P.connectionUI.endpointFromNode(node),p=P.geometry.anchorLocal(end);attributes(node,{transform:`translate(${p.x} ${p.y})`});
       const port=P.port(end.portId);
-      const connected=P.state.connections.some(edge=>[edge.source,edge.target].some(p=>p.componentId===end.componentId&&p.portId===end.portId&&(port||p.anchor===end.anchor)));
+      const connected=P.state.connections.some(edge=>[edge.source,edge.target].some(p=>p.componentId===end.componentId&&p.portId===end.portId&&(port?(p.polarity||'+')===(end.polarity||'+'):p.anchor===end.anchor)));
       node.classList.toggle('connected',connected);
-      node.classList.toggle('over-limit',!!port&&port.maxConnections!==null&&P.portUsage(port.id)>port.maxConnections);
+      node.classList.toggle('over-limit',!!port&&port.maxConnections!==null&&P.portUsage(port.id,end.polarity)>port.maxConnections);
     }
     for(const node of g.querySelectorAll('.resize-handle')){
       const h=node.dataset.handle,x=h.includes('w')?-16:h.includes('e')?c.width+16:c.width/2,y=h.includes('n')?-16:h.includes('s')?c.height+16:c.height/2;

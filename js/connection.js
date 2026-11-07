@@ -17,11 +17,11 @@
     group.querySelectorAll('path').forEach(path=>path.setAttribute('d',route.d));
     group.style.setProperty('--edge-color',P.interfaceColors[edge.interfaceType]);
     group.classList.toggle('selected',P.isSelected(edge.id,'connection'));
-    group.classList.toggle('differential',['PCIe','SerDes'].includes(edge.interfaceType));
+    group.classList.toggle('differential',['PCIe','SerDes'].includes(edge.interfaceType)||P.rfDifferential(edge));group.classList.toggle('rf-differential',P.rfDifferential(edge));
     group.classList.toggle('heavy',['RF','Power'].includes(edge.interfaceType));
     group.classList.toggle('clock',edge.interfaceType==='Clock');
     const label=group.querySelector('.edge-label');attributes(label,{x:route.label.x,y:route.label.y});label.textContent=edge.label;
-    const description=`${P.component(edge.source.componentId).name} → ${P.component(edge.target.componentId).name}: ${edge.label||edge.interfaceType}`;
+    const description=`${P.component(edge.source.componentId).name} → ${P.component(edge.target.componentId).name}: ${edge.label||edge.interfaceType}${P.rfDifferential(edge)?' · 差分 (+/−)':''}`;
     group.setAttribute('aria-label',description);group.querySelector('title').textContent=description;
   }
   function reconcile(){const ids=new Set(P.state.connections.map(e=>e.id));nodes.forEach((g,id)=>{if(!ids.has(id)){g.remove();nodes.delete(id);}});P.state.connections.forEach(draw);}
@@ -34,7 +34,7 @@
     if(type==='mode'||type==='tab'||type==='remove'||type==='ports')cancel();
   });
   let pending=null;
-  function endpointFromNode(node){const p=node?.closest?.('.connection-point');return p?{componentId:p.dataset.componentId,portId:p.dataset.portId||null,anchor:p.dataset.side}:null;}
+  function endpointFromNode(node){const p=node?.closest?.('.connection-point');return p?{componentId:p.dataset.componentId,portId:p.dataset.portId||null,anchor:p.dataset.side,...(p.dataset.polarity?{polarity:p.dataset.polarity}:{})}:null;}
   function targetAt(e){
     const node=document.elementFromPoint(e.clientX,e.clientY),endpoint=endpointFromNode(node);if(endpoint)return endpoint;
     const block=node?.closest?.('.block');if(!block)return null;

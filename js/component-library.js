@@ -3,7 +3,7 @@
   const groups = {
     Processor: ['CPU', 'SoC', 'MCU', 'FPGA'], Memory: ['DDR', 'Flash', 'EEPROM'],
     Communication: ['Ethernet PHY', 'PCIe Switch', 'USB Hub', 'SerDes', 'MIPI Interface'],
-    RF: ['SDR', 'RF Transceiver', 'PA', 'LNA', 'RF Switch', 'Filter', 'Duplexer', 'Antenna'],
+    RF: ['SDR', 'RF Transceiver', 'PA', 'LNA', 'RF Switch', 'Balun', 'Filter', 'Duplexer', 'Antenna'],
     Clock: ['XO', 'TCXO', 'OCXO', 'PLL', 'Clock Generator'],
     Power: ['PMIC', 'Buck Converter', 'Boost Converter', 'LDO'],
     Interface: ['Connector', 'USB Connector', 'Ethernet Connector', 'RF Connector'],

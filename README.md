@@ -144,3 +144,53 @@ Board width/height/thickness inputs retain uncommitted edits across view updates
 
 
 The component list now appears above the Placement canvas and lists every Architecture component, its package/dimensions and current placement status. Each row has **放到 TOP** and **放到 Bottom** actions: unplaced ICs are created on the chosen side; existing ICs move to that side without changing their XY coordinates or rotation. Either action selects the IC and opens its face in the 2D placement editor. Clicking an already placed IC's name selects it. The upper face selector is a **俯視檢視面** filter, while the optional bulk action places only unplaced ICs on the current face.
+
+
+### RF Link Budget (page 04)
+
+1. Add **RF Transceiver** (TRX), PA/LNA, Filter/RF Switch/Duplexer and Antenna components in Architecture. Select a component to enter its RF parameters. Empty RF values are intentionally unconfigured, not assumed to be zero.
+2. TRX supports 1–4 Tx and 1–4 Rx channels. Its Tx DA output power (dBm), Rx internal LNA gain and NF (dB) are shared by all channels. PA uses Gain and output-referred P1dB. LNA uses Gain and NF. Passive Filter/RF Switch/Duplexer use Loss and Max Input Level.
+3. Connect components with engineering connections whose **Interface Type** is **RF**. Set the **Tx 通道** / **Rx 通道** on connections directly adjacent to TRX; channels on intermediate wires do not select the lane. Tx arrows run TRX → RF chain → Antenna; Rx arrows run Antenna → RF chain → TRX. **RF 路徑方向** can restrict an edge to Tx/Rx, or permit both directions for a switched shared path. Every connection has a Loss (dB) field (default 0); only RF connections enter this calculation. Free drawing lines have no RF semantics.
+4. Open **Link Budget**. Set Rx equivalent noise bandwidth in MHz and required SNR in dB. Results update from graph data and include each TRX channel, path, limiting stage and expandable per-stage values. Channels without a connected RF path, missing data, unsupported stages or cycles have no numeric result. Multiple branches are shown separately with conditional-use warnings (no splitter or combiner model). Up to 64 paths and 2000 visits per channel are explored; a truncated result is marked incomplete.
+5. **匯出 Excel (.xlsx)** downloads a real OOXML workbook with Summary, Stages, RF Components, Connections and Assumptions sheets. It is a computed snapshot; edits in Excel do not recalculate the RF model. Recalculate in the app and export again. The workbook includes missing-data warnings and model assumptions.
+
+Tx estimates maximum conducted power at the antenna feed. It subtracts connection and passive losses, adds amplifier gain, and reduces the available DA drive to satisfy all PA output P1dB caps and passive max-input caps. This is a conservative planning-cap approximation, not a nonlinear compression or Psat simulation; it excludes modulation back-off. LNA gain on a Tx path is linear-only and flagged because LNA compression limits are not provided.
+
+Rx uses the Friis noise-factor cascade in signal order from Antenna to TRX, including line losses and the TRX input LNA. At 290 K, a passive stage has NF equal to its loss. Antenna-referred sensitivity = −174 + 10 log10(BW Hz) + cascaded NF + required SNR, in dBm. It does not model mixer/ADC contributions after the TRX LNA, antenna gain, EIRP, propagation loss, matching, interference or frequency response. All passive losses are assumed to be at the 290 K reference temperature.
+
+References: [Analog Devices: Improving Receiver Sensitivity with External LNA](https://www.analog.com/en/resources/technical-articles/improving-receiver-sensitivity-with-external-lna.html), [Keysight: P1dB](https://www.keysight.com/us/en/use-cases/measure-amplifier-gain-compression-and-p1db.html), [Microsoft: SpreadsheetML structure](https://learn.microsoft.com/en-us/office/open-xml/spreadsheet/structure-of-a-spreadsheetml-document).
+
+Deploy the complete `index.html`, `css` and `js` directories together, including `rf-model.js`, `link-budget.js`, `link-budget-ui.js`, and `xlsx-export.js`. No CDN, backend or runtime installation is required.
+
+
+Connect between general connection points on two RF signal components now defaults to RF. An explicit interface selection or typed engineering port still takes precedence. Link Budget detects older Digital connections between RF components and offers an explicit conversion action; existing graphs are not silently reinterpreted. Missing-path diagnostics identify these excluded lines. SDR/baseband and clock/power/control connections do not default to RF.
+
+
+### Managed TRX and RF Switch ports
+
+TRX Tx/Rx counts now maintain named TX1…TX4 (outputs) and RX1…RX4 (inputs) RF engineering ports. Connect to the named squares on the block; port names are shown beside them. Port identity determines the Link Budget channel, taking precedence over manually entered wire channel metadata. Remaining port UUIDs and connections are preserved when counts increase. A reduction is rejected if a removed port still has connections; disconnect that port first. Managed RF ports are removed through the count controls rather than individual delete buttons. Non-RF control ports remain independent.
+
+RF Switch exposes **RF 分支 Port 數量** (1–32, default 2; RFC is additional). Each managed RF port has its own **Port Loss (dB)** (0–100) and **Port Max Level (dBm)** (−100–100), initially unconfigured. Connect both the entry and exit wires to distinct named RF ports. A traversed switch contributes two stages: entry-port loss and exit-port loss, summed; each Max Level is treated as that loss stage's input power cap. Rx includes both losses in its cascaded noise model. General-anchor switch paths are incomplete unless they contain older explicit aggregate loss/max-input values, in which case the old approximation is preserved with a migration warning. New designs should always use named RF ports. Switch branches represent alternative switching paths, not simultaneous power splitting.
+
+The RF ports editor appears directly below the component RF parameters. Ports persist in saved projects and copy/paste; compatible legacy named RF ports are adopted without replacing their UUIDs. Excel now includes an **RF Ports** worksheet with each port's owner, direction, managed lane, loss and maximum level.
+
+
+### Fixed RF port sides and switch common port
+
+All managed TRX TXn and RXn ports are fixed on the **right**. An RF Switch has **RF1…RFN on the left** and exactly one **RFC on the right**. RF 分支 Port 數量 counts left branches only (1–32); total managed RF ports = N + 1. RFC remains present at every branch count and has its own Loss and Max Level, like every branch. The managed ports' names and sides are fixed; non-RF engineering ports remain independently configurable.
+
+Switch routing evaluates RFN ↔ RFC paths, not RFN ↔ RFM. Existing port IDs, values and connected endpoint references survive layout updates. For older switch projects without the common-port layout marker, the last right-hand managed RF port is adopted as RFC, preserving its UUID/parameters/connections; missing left branch ports are then added. Legacy TRX RX ports move to the right and wire anchor sides update accordingly.
+
+
+### Differential TRX RF ports and Balun
+
+Select a TRX and set **RF 走線模式** separately on each TXn/RXn port: **單端 Single-ended** (default) or **差分 Differential (+/−)**. The port retains its UUID and lane when toggled; connected RF wires redraw as double traces in differential mode. A differential port represents one logical RF channel carrying the +/− pair, not two independently routed channels. Wire Loss and power refer to the complete channel; no automatic 3 dB split/combination adjustment is applied.
+
+The RF library includes **Balun**, with a fixed differential **BAL +/−** port on the left and single-ended **UNBAL** on the right, both bidirectional. Fill its Loss and Max Input Level for Tx evaluation (Loss is required for Rx). Connect TRX differential → BAL, then UNBAL → single-ended RF chain for Tx; reverse signal flow for Rx. Link Budget checks endpoint modes, requires traversal between BAL and UNBAL and includes the balun insertion loss in Tx gain / Rx noise cascade. A direct differential-to-single-ended wire is marked incomplete. This planning model does not simulate impedance transformation, amplitude/phase imbalance or physical PCB pair-length matching.
+
+
+### Individually connectable differential conductors
+
+Differential TRX channels now display two separate connection points, e.g. **TX1+ / TX1−** and **RX1+ / RX1−**, on the right. Balun likewise displays separate **BAL+ / BAL−** endpoints on the left, plus UNBAL on the right. Connect + to + and − to − independently with Connect. Each endpoint can have its own wire and capacity is enforced per conductor; the channel's routing-mode setting remains shared.
+
+Link Budget groups a complete pair into one RF channel, with no automatic 3 dB adjustment. It requires the same source/destination port pair, correct matching polarity, equal Loss and equal RF route mode on both wires. Incomplete pairs, crossed polarity or differing pair loss are flagged rather than assumed valid. Only one leg is evaluated numerically; both wire IDs appear in the editable route details. Existing unsplit differential wires keep their IDs and appear at the + endpoint; add the missing − wire to complete the pair. Switching back to single-ended is blocked while any − wire remains. Excel Connections includes source/target port and polarity.

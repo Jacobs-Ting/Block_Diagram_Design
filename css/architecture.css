@@ -19,3 +19,4 @@
 
 /* Direct manipulation rotation control for selected blocks. */
 .rotation-controls{display:none}.block.selected .rotation-controls{display:inline}.rotation-stem{stroke:#60d5bf;stroke-width:1.5;stroke-dasharray:3 3;pointer-events:none}.rotation-handle{fill:#142d2a;stroke:#60d5bf;stroke-width:2;cursor:grab}.rotation-handle:active{cursor:grabbing}.connect-mode .rotation-controls{display:none}:root[data-theme="light"] .rotation-handle{fill:#e2f3ef;stroke:#087f70}:root[data-theme="light"] .rotation-stem{stroke:#087f70}
+.connection.rf-differential .edge-line{stroke-width:5}.connection.rf-differential .edge-core{stroke-width:1.8}.rf-differential-port .point-dot{stroke-width:1.5}

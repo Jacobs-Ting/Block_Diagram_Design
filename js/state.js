@@ -6,7 +6,7 @@
   P.fonts = ['Segoe UI','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Courier New','Consolas'];
   P.shapes = ['rectangle','circle','triangle','diamond'];
   P.interfaceColors = {Digital:'#96adca',PCIe:'#83acff',USB:'#af9dfa',SPI:'#78c6dc',I2C:'#78c6dc',UART:'#98b8cc',GPIO:'#98b8cc',MIPI:'#d1a5ef',SerDes:'#83acff',Ethernet:'#79d4ca',RF:'#61d3b3',Clock:'#e6c57d',Power:'#ed9b79',Ground:'#9da8b4',Analog:'#d996bd'};
-  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,thickness:1.6,unit:'mm'},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
+  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,thickness:1.6,unit:'mm'},linkBudget:{bandwidthMHz:20,snrDb:10},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
   P.ui = {tab:'architecture',selected:null,selectedKind:null,snap:true,mode:'select'};
   const listeners = new Set();
   P.subscribe = fn => {listeners.add(fn);return()=>listeners.delete(fn);};
@@ -18,13 +18,13 @@
   P.componentPorts = id => P.state.ports.filter(p=>p.componentId===id);
   P.minimumSize = id => {
     const c=P.component(id),ports=P.componentPorts(id);
-    const count=side=>ports.filter(p=>p.side===side).length;
+    const count=side=>ports.filter(p=>p.side===side).reduce((n,p)=>n+(p.signalMode==='differential'?2:1),0);
     return {width:Math.max(c?.minWidth||180,(Math.max(count('top'),count('bottom'))+2)*24),height:Math.max(c?.minHeight||112,(Math.max(count('left'),count('right'))+2)*24)};
   };
-  P.addComponent = (name,x=70,y=100,extra={}) => {
+  P.addComponent = (name,x=70,y=100,extra={},createPorts=true) => {
     const template=P.library.find(c=>c.name===name)||{name,category:'Other'};
-    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,...extra,id:P.uuid()};
-    P.state.components.push(c);P.notify('add',c.id);return c;
+    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,...P.rfDefaults({type:template.name}),...extra,id:P.uuid()};
+    P.state.components.push(c);if(createPorts)P.syncRfPorts(c);P.notify('add',c.id);return c;
   };
   P.ui.selection=[];
   P.isSelected = (id,kind) => P.ui.selection.some(item=>item.id===id&&item.kind===kind);
@@ -72,6 +72,8 @@
   P.update = (id,changes,type='update') => {
     const c=P.component(id);if(!c)return false;
     const next={...changes};
+    if(!P.validRf(c,next))return false;
+    if(!P.canSyncRfPorts({...c,...next}))return P.warn('減少路數前，請先移除超出範圍 RF port 的連線。')||false;
     for(const key of ['x','y','width','height','rotation'])if(key in next&&!Number.isFinite(next[key]))return false;
     if('renderColor' in next&&!/^#[0-9a-f]{6}$/i.test(next.renderColor))return false;
     if('textColor' in next&&!/^#[0-9a-f]{6}$/i.test(next.textColor))return false;
@@ -93,10 +95,10 @@
     if('width' in next)next.width=Math.max(min.width,next.width);
     if('height' in next)next.height=Math.max(min.height,next.height);
     if('rotation' in next)next.rotation=((next.rotation%360)+360)%360;
-    delete next.id;Object.assign(c,next);P.notify(type,id);return true;
+    delete next.id;Object.assign(c,next);if(['txChannels','rxChannels','rfPortCount'].some(k=>k in next)){P.syncRfPorts(c);P.notify('ports',id);}P.notify(type,id);return true;
   };
-  P.portUsage = id => P.state.connections.filter(e=>e.source.portId===id||e.target.portId===id).length;
-  function validPort(p){return P.sides.includes(p.side)&&P.interfaces.includes(p.type)&&['input','output','bidirectional'].includes(p.direction)&&(p.maxConnections===null||(Number.isInteger(p.maxConnections)&&p.maxConnections>=1));}
+  P.portUsage = (id,polarity) => P.state.connections.filter(e=>[e.source,e.target].some(end=>end.portId===id&&(!polarity||(end.polarity||'+')===polarity))).length;
+  function validPort(p){return P.validRfPort(p)&&P.sides.includes(p.side)&&P.interfaces.includes(p.type)&&['input','output','bidirectional'].includes(p.direction)&&(p.maxConnections===null||(Number.isInteger(p.maxConnections)&&p.maxConnections>=1));}
   P.addPort = (componentId,options={}) => {
     if(!P.component(componentId))return null;
     const p={name:'New port',type:'Digital',side:'right',direction:'bidirectional',maxConnections:null,...options,id:P.uuid(),componentId};
@@ -106,14 +108,17 @@
   P.updatePort = (id,changes) => {
     const p=P.port(id);if(!p)return false;
     const next={...p,...changes,id:p.id,componentId:p.componentId};if(!validPort(next))return false;
-    Object.assign(p,next);const c=P.component(p.componentId),min=P.minimumSize(c.id);c.width=Math.max(c.width,min.width);c.height=Math.max(c.height,min.height);
+    if(p.rfKey){if(P.component(p.componentId)?.type==='Balun'&&next.signalMode!==p.signalMode)return false;for(const key of ['type','direction','rfKey','name','side'])if(next[key]!==p[key])return false;}
+    if(p.signalMode==='differential'&&next.signalMode!=='differential'&&P.portUsage(id,'-'))return P.warn('切換單端前，請先移除 − 端點連線。')||false;
+    Object.assign(p,next);
+    if(p.signalMode!=='differential')for(const e of P.state.connections)for(const end of [e.source,e.target])if(end.portId===id)delete end.polarity;const c=P.component(p.componentId),min=P.minimumSize(c.id);c.width=Math.max(c.width,min.width);c.height=Math.max(c.height,min.height);
     P.state.connections.forEach(e=>[e.source,e.target].forEach(end=>{if(end.portId===id)end.anchor=p.side;}));
     P.notify('ports',c.id);
-    if(p.maxConnections!==null&&P.portUsage(id)>p.maxConnections)P.warn(`${p.name}: ${P.portUsage(id)} connections exceed the limit ${p.maxConnections}. Remove excess connections or increase the limit.`);
+    if(p.maxConnections!==null&&P.portUsage(id)>p.maxConnections*(p.signalMode==='differential'?2:1))P.warn(`${p.name}: ${P.portUsage(id)} connections exceed the limit ${p.maxConnections}. Remove excess connections or increase the limit.`);
     return true;
   };
   P.removePort = id => {
-    const p=P.port(id);if(!p)return;
+    const p=P.port(id);if(!p)return;if(p.rfKey)return P.warn('此 RF port 由元件路數管理，請調整 Tx／Rx 或 RF Port 數量。');
     P.state.connections=P.state.connections.filter(e=>e.source.portId!==id&&e.target.portId!==id);
     P.state.ports=P.state.ports.filter(port=>port.id!==id);P.notify('ports',p.componentId);
   };
@@ -122,23 +127,27 @@
     const port=end.portId?P.port(end.portId):null;
     if(end.portId&&(!port||port.componentId!==end.componentId))return null;
     const anchor=port?.side||end.anchor;if(!P.sides.includes(anchor))return null;
-    return {componentId:end.componentId,portId:port?.id||null,anchor};
+    if(end.polarity!==undefined&&(!['+','-'].includes(end.polarity)||port?.signalMode!=='differential'))return null;
+    return {componentId:end.componentId,portId:port?.id||null,anchor,...(port?.signalMode==='differential'?{polarity:end.polarity||'+'}:{})};
   }
   P.addConnection = (source,target,options={}) => {
     source=normalizeEndpoint(source);target=normalizeEndpoint(target);
     if(!source||!target)return P.warn('Connection endpoint is no longer available.');
     if(source.componentId===target.componentId)return P.warn('Choose a different target component.');
-    for(const end of [source,target]){const port=P.port(end.portId);if(port&&port.maxConnections!==null&&P.portUsage(port.id)>=port.maxConnections)return P.warn(`${P.component(end.componentId).name} / ${port.name}: connection limit (${port.maxConnections}) reached.`);}
-    const interfaceType=options.interfaceType||P.port(source.portId)?.type||P.port(target.portId)?.type||'Digital';
+    for(const end of [source,target]){const port=P.port(end.portId);if(port&&port.maxConnections!==null&&P.portUsage(port.id,port.signalMode==='differential'?(end.polarity||'+'):undefined)>=port.maxConnections)return P.warn(`${P.component(end.componentId).name} / ${port.name}: connection limit (${port.maxConnections}) reached.`);}
+    const interfaceType=options.interfaceType||P.port(source.portId)?.type||P.port(target.portId)?.type||(P.isRfPair(source,target)?'RF':'Digital');
     if(!P.interfaces.includes(interfaceType))return P.warn('Unknown interface type.');
-    const edge={id:P.uuid(),source,target,interfaceType,label:options.label||'',description:options.description||'',routingStyle:options.routingStyle==='straight'?'straight':'orthogonal'};
+    const edge={id:P.uuid(),source,target,interfaceType,label:options.label||'',description:options.description||'',routingStyle:options.routingStyle==='straight'?'straight':'orthogonal',loss:options.loss??0,rfMode:options.rfMode??'auto',txChannel:options.txChannel??1,rxChannel:options.rxChannel??1};
+    if(interfaceType==='RF'){for(const end of [source,target]){const port=P.port(end.portId);if(port?.rfKey&&P.isTrx(P.component(end.componentId))){const [role,n]=port.rfKey.split(':');edge[role==='tx'?'txChannel':'rxChannel']=Number(n);}}}
+    if(!P.validRfEdge(edge))return P.warn('Loss 須為 0–100 dB；RF 通道路數須為 1–4。');
     P.state.connections.push(edge);P.ui.warning='';P.notify('connection-add',edge.id);return edge;
   };
   P.updateConnection = (id,changes) => {
     const edge=P.connection(id);if(!edge)return false;
+    if(!P.validRfEdge({...edge,...changes}))return false;
     if(changes.interfaceType&&!P.interfaces.includes(changes.interfaceType))return false;
     if(changes.routingStyle&&!['straight','orthogonal'].includes(changes.routingStyle))return false;
-    for(const key of ['interfaceType','label','description','routingStyle'])if(key in changes)edge[key]=changes[key];
+    for(const key of ['interfaceType','label','description','routingStyle','loss','rfMode','txChannel','rxChannel'])if(key in changes)edge[key]=changes[key];
     P.notify('connection-update',id);return true;
   };
   P.removeConnection = id => {P.state.connections=P.state.connections.filter(e=>e.id!==id);if(P.ui.selectedKind==='connection'&&P.ui.selected===id){P.ui.selected=null;P.ui.selectedKind=null;}P.notify('connection-remove',id);};

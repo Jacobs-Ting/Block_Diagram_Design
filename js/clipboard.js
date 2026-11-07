@@ -16,7 +16,7 @@
   P.pasteSelection=()=>{
     if(!clipboard)return false;
     P.setMode('select');const data=clone(clipboard),offset=40*(++pasteCount),components=new Map(),ports=new Map(),selected=[];
-    for(const c of data.components){const added=P.addComponent(c.type,c.x+offset,c.y+offset,{...c,x:c.x+offset,y:c.y+offset});components.set(c.id,added.id);selected.push({id:added.id,kind:'component'});}
+    for(const c of data.components){const added=P.addComponent(c.type,c.x+offset,c.y+offset,{...c,x:c.x+offset,y:c.y+offset},false);components.set(c.id,added.id);selected.push({id:added.id,kind:'component'});}
     for(const port of data.ports){const added=P.addPort(components.get(port.componentId),port);ports.set(port.id,added.id);}
     const endpoint=end=>({...end,componentId:components.get(end.componentId)||end.componentId,portId:ports.get(end.portId)||end.portId});
     let skipped=0;

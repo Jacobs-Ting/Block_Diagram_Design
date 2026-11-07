@@ -7,7 +7,8 @@
   function anchorLocal(end,edgeId){
     const c=P.component(end.componentId),port=P.port(end.portId);if(!c)return null;
     const side=port?.side||end.anchor,ports=P.componentPorts(c.id).filter(p=>p.side===side);
-    const index=end.portId?ports.findIndex(p=>p.id===end.portId)+1:0,count=ports.length+1;
+    const physical=p=>p.signalMode==='differential'?2:1,at=ports.findIndex(p=>p.id===end.portId);
+    const index=end.portId?ports.slice(0,at).reduce((n,p)=>n+physical(p),0)+1+(port?.signalMode==='differential'&&end.polarity==='-'?1:0):0,count=ports.reduce((n,p)=>n+physical(p),0)+1;
     const length=side==='left'||side==='right'?c.height:c.width;
     let along=length*(index+1)/(count+1);
     if(!end.portId&&edgeId){
@@ -39,7 +40,7 @@
   // Treat reverse edges as part of the same bundle. IDs and local anchors,
   // rather than rendered coordinates, keep lane membership stable on resize.
   function parallelEdges(edge){
-    const key=end=>JSON.stringify([end.componentId,end.portId,P.port(end.portId)?.side||end.anchor]);
+    const key=end=>JSON.stringify([end.componentId,end.portId,P.port(end.portId)?.side||end.anchor,end.polarity||'+']);
     const pair=e=>[key(e.source),key(e.target)].sort().join('|');
     const group=pair(edge);return P.state.connections.filter(e=>pair(e)===group);
   }
