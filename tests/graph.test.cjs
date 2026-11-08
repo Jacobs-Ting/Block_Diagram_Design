@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-function setup(demo=false){const context={window:{},crypto:require('node:crypto').webcrypto};vm.createContext(context);for(const file of ['component-library','state','geometry',...(demo?['demo']:[])])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js',file+'.js'),'utf8'),context);return context.window.Planner;}
+function setup(demo=false){const context={window:{},crypto:require('node:crypto').webcrypto};vm.createContext(context);for(const file of ['component-library','rf-model','placement-rules','state','geometry',...(demo?['demo']:[])])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js',file+'.js'),'utf8'),context);return context.window.Planner;}
 const end=(c,anchor='right',port=null)=>({componentId:c.id,portId:port?.id||null,anchor});
 const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-7,`${actual} != ${expected}`);
 test('Demo presents four distinct SDR-right to TRX-left signals within the inter-block gap',()=>{

@@ -51,7 +51,7 @@ Phase 1 Engineering Graph MVP。直接以 Chrome / Edge 開啟 `index.html`，�
 
 ## 操作
 
-- 左側提供 40 種元件。拖到 Architecture 畫布，或點擊加入。
+- 左側提供 42 種元件。拖到 Architecture 畫布，或點擊加入。
 - **Select**：點選 Block 後可拖曳移動。八個綠色方形 Handle 位於四角與四側，拖曳即可縮放。
 - 右側 **Width / Height** 可直接輸入畫布單位；最小尺寸為 180 × 112。工程 Port 很多時，最小尺寸會增加以保留間距。關閉 Snap 即可不受 20 單位格線限制。
 - **Rotation** 支援 0° / 90° / 180° / 270°；Port、連線與縮放座標會跟隨旋轉。
@@ -194,3 +194,12 @@ The RF library includes **Balun**, with a fixed differential **BAL +/−** port 
 Differential TRX channels now display two separate connection points, e.g. **TX1+ / TX1−** and **RX1+ / RX1−**, on the right. Balun likewise displays separate **BAL+ / BAL−** endpoints on the left, plus UNBAL on the right. Connect + to + and − to − independently with Connect. Each endpoint can have its own wire and capacity is enforced per conductor; the channel's routing-mode setting remains shared.
 
 Link Budget groups a complete pair into one RF channel, with no automatic 3 dB adjustment. It requires the same source/destination port pair, correct matching polarity, equal Loss and equal RF route mode on both wires. Incomplete pairs, crossed polarity or differing pair loss are flagged rather than assumed valid. Only one leg is evaluated numerically; both wire IDs appear in the editable route details. Existing unsplit differential wires keep their IDs and appear at the + endpoint; add the missing − wire to complete the pair. Switching back to single-ended is blocked while any − wire remains. Excel Connections includes source/target port and polarity.
+
+
+### IC Keep Out and component specifications
+
+Every component's Architecture inspector has independent **啟用同面 Keep Out** and **啟用背面 Keep Out** controls. **同面額外邊距 (mm／每側)** expands the rotated IC envelope by that margin on all four sides (default 1 mm; 0–1000 allowed). Opposite-face Keep Out is the exact XY projection of the rotated IC envelope, without extra margin. Top and Bottom share the same XY reference. Keep Out belongs to the placed IC, moves/rotates with it, and disappears when it is unplaced or deleted. Regions may extend outside the board; only on-board IC footprints are constrained. Other IC footprints cannot overlap the protected rectangle; touching its boundary is allowed. Protected rectangles may overlap one another if no other IC footprint enters them.
+
+Placement shows amber same-face regions and purple opposite-face regions in 2D and on the visible 3D board face. Adding an IC searches for a legal free position. Dragging, numeric XY edits, rotation, face changes, IC size/Keep Out edits and board resize all check the rule before committing. A blocked action preserves previous geometry and shows a reason. Board shrinking is rejected if clamping would create a Keep Out conflict. Previously valid data is preserved when another edit fails. Imports with enabled Keep Out violations are rejected rather than silently moving ICs. Legacy components default to both Keep Out controls disabled.
+
+CPU properties include **CPU 核心數** and **CPU 時脈 (MHz)**. DDR and the new **eMMC** library component include capacity and a unit selector (**Mb, Gb, MB, GB, TB**; case distinguishes bits from bytes). Empty specification values are allowed and mean unconfigured. These fields, along with Keep Out settings, persist in JSON/local saves and component copy/paste.

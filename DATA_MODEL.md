@@ -113,3 +113,10 @@ RF ports optionally store `signalMode: single | differential` (legacy undefined 
 
 
 Differential `connection.source` / `.target` endpoints optionally store `polarity: + | -`. A differential RF port is a shared logical channel with two independent SVG connection points and separate capacity accounting. Undefined polarity on legacy differential endpoints means +. Geometry allocates two positions to each differential port; a pair is deduplicated for RF path search and both physical edge IDs are retained for reporting. Pair matching requires identical directed source/target component/port IDs, opposite matching polarities, and consistent RF mode/loss. Each individual conductor is rendered as one line.
+
+
+### Keep Out / CPU / memory
+
+All components store `keepOutSame` / `keepOutOpposite` booleans (default false), and `keepOutMargin` in mm per side (default 1, range 0–1000). The same-face protection uses the placement's rotated width/height expanded by the margin; opposite-face protection uses the unexpanded rotated footprint on the opposite mounting side. The owner never conflicts with itself; checks compare other IC footprints against zones in both directions. Regions are derived from current placement/component data, not separately persisted. `placement-rules.js` provides common validation for editor operations and import. Existing placement collision warnings still apply when Keep Out is disabled.
+
+Nullable component specification fields: `cpuCores` (integer 1–1024), `cpuClockMHz` (>0 to 100000), `memoryCapacity` (>0 to 1e9), and `memoryUnit` (`Mb`, `Gb`, `MB`, `GB`, `TB`; default `GB`). CPU/DDR/eMMC inspectors expose the relevant fields; copies preserve them and old projects migrate to unconfigured null values.

@@ -23,7 +23,7 @@
   };
   P.addComponent = (name,x=70,y=100,extra={},createPorts=true) => {
     const template=P.library.find(c=>c.name===name)||{name,category:'Other'};
-    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,...P.rfDefaults({type:template.name}),...extra,id:P.uuid()};
+    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,...P.componentExtraDefaults,...P.rfDefaults({type:template.name}),...extra,id:P.uuid()};
     P.state.components.push(c);if(createPorts)P.syncRfPorts(c);P.notify('add',c.id);return c;
   };
   P.ui.selection=[];
@@ -72,7 +72,7 @@
   P.update = (id,changes,type='update') => {
     const c=P.component(id);if(!c)return false;
     const next={...changes};
-    if(!P.validRf(c,next))return false;
+    if(!P.validRf(c,next)||!P.validComponentExtras({...c,...next}))return false;
     if(!P.canSyncRfPorts({...c,...next}))return P.warn('減少路數前，請先移除超出範圍 RF port 的連線。')||false;
     for(const key of ['x','y','width','height','rotation'])if(key in next&&!Number.isFinite(next[key]))return false;
     if('renderColor' in next&&!/^#[0-9a-f]{6}$/i.test(next.renderColor))return false;
@@ -84,13 +84,16 @@
     if('icPackage' in next&&!['QFN','BGA','SOT'].includes(next.icPackage))return false;
     if('icPinCount' in next&&(!Number.isInteger(next.icPinCount)||next.icPinCount<2||next.icPinCount>64||next.icPinCount%2!==0))return false;
     if('icThickness' in next&&(!Number.isFinite(next.icThickness)||next.icThickness<0.1||next.icThickness>1000))return false;
+    let proposedPlacement=null;
     const placement=P.state.placements.find(p=>p.componentId===id);
     if(placement&&('icWidth' in next||'icHeight' in next)){
       const width=next.icWidth??c.icWidth,height=next.icHeight??c.icHeight;
       const w=placement.rotation%180?height:width,h=placement.rotation%180?width:height;
       if(w>P.state.board.width||h>P.state.board.height)return false;
-      Object.assign(placement,{width,height,x:Math.max(0,Math.min(placement.x,P.state.board.width-w)),y:Math.max(0,Math.min(placement.y,P.state.board.height-h))});
+      proposedPlacement={...placement,width,height,x:Math.max(0,Math.min(placement.x,P.state.board.width-w)),y:Math.max(0,Math.min(placement.y,P.state.board.height-h))};
     }
+    if(placement){const state={...P.state,components:P.state.components.map(c=>c.id===id?{...c,...next}:c),placements:P.state.placements.map(p=>p===placement?(proposedPlacement||p):p)};const error=P.boardRules.conflict(proposedPlacement||placement,state);if(error)return P.warn(error)||false;}
+    if(proposedPlacement)Object.assign(placement,proposedPlacement);
     const min=P.minimumSize(id);
     if('width' in next)next.width=Math.max(min.width,next.width);
     if('height' in next)next.height=Math.max(min.height,next.height);

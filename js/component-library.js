@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const groups = {
-    Processor: ['CPU', 'SoC', 'MCU', 'FPGA'], Memory: ['DDR', 'Flash', 'EEPROM'],
+    Processor: ['CPU', 'SoC', 'MCU', 'FPGA'], Memory: ['DDR', 'eMMC', 'Flash', 'EEPROM'],
     Communication: ['Ethernet PHY', 'PCIe Switch', 'USB Hub', 'SerDes', 'MIPI Interface'],
     RF: ['SDR', 'RF Transceiver', 'PA', 'LNA', 'RF Switch', 'Balun', 'Filter', 'Duplexer', 'Antenna'],
     Clock: ['XO', 'TCXO', 'OCXO', 'PLL', 'Clock Generator'],

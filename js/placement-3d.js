@@ -33,6 +33,15 @@
       const layer=node('g',{'data-layer':name});
       items.sort((a,b)=>a.depth-b.depth);for(const f of items)layer.append(f.node);
       svg.append(layer);
+      if(name==='board'){
+        const keepouts=node('g',{'data-layer':'keepouts','pointer-events':'none'}),face=above?'top':'bottom',z=above?b.thickness+.03:-.03;
+        for(const placement of P.state.placements)for(const area of P.boardRules.zones(placement,P.component(placement.componentId)).filter(a=>a.side===face)){
+          const corners=[[area.x,area.y],[area.x+area.w,area.y],[area.x+area.w,area.y+area.h],[area.x,area.y+area.h]].map(([x,y])=>project(x,y,z));
+          const poly=node('polygon',{points:corners.map(p=>`${p.x},${p.y}`).join(' '),fill:area.kind==='same'?'#f5b85b':'#d68df1','fill-opacity':.12,stroke:area.kind==='same'?'#f5b85b':'#d68df1','stroke-width':.3,'stroke-dasharray':'1 .8'});keepouts.append(poly);
+        }
+        if(keepouts.childNodes.length)svg.append(keepouts);
+      }
+
     }
     const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x)),minY=Math.min(...points.map(p=>p.y)),maxY=Math.max(...points.map(p=>p.y)),w=(maxX-minX+14)/zoom,h=(maxY-minY+14)/zoom;
     svg.setAttribute('viewBox',`${(minX+maxX-w)/2} ${(minY+maxY-h)/2} ${w} ${h}`);

@@ -15,6 +15,7 @@
     raw.linkBudget=raw.linkBudget??{bandwidthMHz:20,snrDb:10};
     if(!Number.isFinite(raw.linkBudget.bandwidthMHz)||raw.linkBudget.bandwidthMHz<=0||raw.linkBudget.bandwidthMHz>100000||!Number.isFinite(raw.linkBudget.snrDb)||raw.linkBudget.snrDb< -100||raw.linkBudget.snrDb>100)throw new Error('Link Budget 頻寬或 SNR 無效。');
     raw.components.forEach(c=>{for(const [k,v] of Object.entries(P.rfDefaults(c)))if(c[k]===undefined)c[k]=v;if(!P.validRf(c,c))throw new Error('RF 元件參數無效。');});
+    raw.components.forEach(c=>{for(const [key,value] of Object.entries(P.componentExtraDefaults))if(c[key]===undefined)c[key]=value;if(!P.validComponentExtras(c))throw new Error('Keep Out、CPU 或記憶體規格無效。');});
     const componentIds=new Set(raw.components.map(c=>c.id));
     raw.ports.forEach(port=>{claim(port);if(!P.validRfPort(port))throw new Error('RF Port Loss／Max Level 無效。');if(!componentIds.has(port.componentId)||!P.sides.includes(port.side)||!P.interfaces.includes(port.type))throw new Error('Port 參照或類型無效。');});
     const portMap=new Map(raw.ports.map(port=>[port.id,port]));
@@ -30,6 +31,7 @@
     raw.placements.forEach(p=>{p.side=p.side??'top';if(!['top','bottom'].includes(p.side))throw new Error('擺放面須為 Top 或 Bottom。');claim(p);if(!componentIds.has(p.componentId)||placed.has(p.componentId)||!['x','y','width','height','rotation'].every(k=>Number.isFinite(p[k]))||p.width<1||p.height<1||![0,90,180,270].includes(p.rotation))throw new Error('虛擬 IC 擺件資料無效。');const w=p.rotation%180?p.height:p.width,h=p.rotation%180?p.width:p.height;if(p.x<0||p.y<0||p.x+w>raw.board.width||p.y+h>raw.board.height)throw new Error('虛擬 IC 超出電路板範圍。');placed.add(p.componentId);});
     raw.placements.forEach(p=>{const c=raw.components.find(c=>c.id===p.componentId);p.width=c.icWidth;p.height=c.icHeight;const w=p.rotation%180?p.height:p.width,h=p.rotation%180?p.width:p.height;if(w>raw.board.width||h>raw.board.height)throw new Error('IC 尺寸超出電路板範圍。');p.x=Math.max(0,Math.min(p.x,raw.board.width-w));p.y=Math.max(0,Math.min(p.y,raw.board.height-h));});
     raw.components.forEach(c=>P.syncRfPorts(c,raw));
+    const clearanceError=P.boardRules.all(raw);if(clearanceError)throw new Error(clearanceError);
     return clone(raw);
   }
   function load(raw){

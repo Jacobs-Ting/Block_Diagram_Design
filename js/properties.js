@@ -102,6 +102,23 @@
       if(P.isTrx(c))panel.append(text('p','inspector-note','Tx／Rx 各最多 4 路，共用本元件 RF 參數；路數會自動更新 TXn／RXn RF ports。請從具名 RF port 接線。'));
     }
     if(P.isTrx(c)||c.type==='RF Switch'||c.type==='Balun'){panel.append(text('p','inspector-note',c.type==='Balun'?'左側 BAL 為差分平衡端，右側 UNBAL 為單端；請填入 Balun 的 Loss／Max Input Level。':c.type==='RF Switch'?'左側 RF1～RFN 為分支，右側固定一個 RFC 共用端。每條切換路徑為 RFN ↔ RFC；兩端分別填入 Loss／Max Level，損耗相加。':'RF port 由 Tx／Rx 路數管理；請從對應 TXn／RXn 接線，通道會自動辨識。'));ports(c);}
+    if(c.type==='CPU'){
+      panel.append(text('h3','section-title','CPU 規格'));
+      field(panel,'CPU 核心數',c.cpuCores,value=>P.update(c.id,{cpuCores:value}),{name:'cpuCores',number:true,min:1,max:1024,nullable:true,commit:true});
+      field(panel,'CPU 時脈 (MHz)',c.cpuClockMHz,value=>P.update(c.id,{cpuClockMHz:value}),{name:'cpuClockMHz',number:true,min:.000001,max:100000,step:.1,nullable:true,commit:true});
+    }
+    if(['ddr','emmc'].includes(c.type.toLowerCase())){
+      panel.append(text('h3','section-title','記憶體 / 儲存容量'));
+      field(panel,'容量',c.memoryCapacity,value=>P.update(c.id,{memoryCapacity:value}),{name:'memoryCapacity',number:true,min:.000001,max:1e9,step:.001,nullable:true,commit:true});
+      field(panel,'容量單位',c.memoryUnit,value=>P.update(c.id,{memoryUnit:value}),{name:'memoryUnit',choices:['Mb','Gb','MB','GB','TB'],commit:true});
+    }
+    panel.append(text('h3','section-title','IC KEEP OUT'));
+    for(const [key,label] of [['keepOutSame','啟用同面 Keep Out'],['keepOutOpposite','啟用背面 Keep Out']]){
+      const wrapper=text('label','field',label),input=document.createElement('input');input.type='checkbox';input.name=key;input.checked=c[key];input.style.width='auto';
+      input.onchange=()=>{if(!P.update(c.id,{[key]:input.checked},'keepout-update')){input.checked=c[key];input.setCustomValidity('目前擺件會違反 Keep Out，請先移動附近元件。');input.reportValidity();}else input.setCustomValidity('');};wrapper.append(input);panel.append(wrapper);
+    }
+    field(panel,'同面額外邊距 (mm／每側)',c.keepOutMargin,(value,input)=>{if(!P.update(c.id,{keepOutMargin:value},'keepout-update')){input.value=c.keepOutMargin;input.setCustomValidity('邊距會涵蓋其他 IC，請先調整擺件。');input.reportValidity();}else input.setCustomValidity('');},{name:'keepOutMargin',number:true,min:0,max:1000,step:.1,commit:true});
+    panel.append(text('p','inspector-note','同面禁佈區為 IC 外框向四邊擴張指定邊距；背面禁佈區為相同 XY 投影、與 IC 同尺寸。其他 IC 不可進入；框線可接觸。'));
     if(c.type==='SDR'){
       panel.append(text('h3','section-title','RF 參數設定位置'));
       panel.append(text('p','inspector-note','SDR 為基頻方塊。Tx／Rx 路數、DA Power、Rx LNA Gain／NF 請選擇 RF Transceiver（TRX）設定；PA、LNA、Filter、RF Switch 各有對應 RF 欄位。'));
