@@ -23,7 +23,7 @@
   };
   P.addComponent = (name,x=70,y=100,extra={},createPorts=true) => {
     const template=P.library.find(c=>c.name===name)||{name,category:'Other'};
-    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,...P.componentExtraDefaults,...P.rfDefaults({type:template.name}),...extra,id:P.uuid()};
+    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,packageSpec:'',componentValue:'',...(P.isPassive({type:name})?{icPackage:'0402',...P.imperialPackages['0402'],icThickness:0.5}:template.category==='Connector'?{icPackage:'Custom'}:{}),...P.componentExtraDefaults,...P.rfDefaults({type:template.name}),...extra,id:P.uuid()};
     P.state.components.push(c);if(createPorts)P.syncRfPorts(c);P.notify('add',c.id);return c;
   };
   P.ui.selection=[];
@@ -72,6 +72,12 @@
   P.update = (id,changes,type='update') => {
     const c=P.component(id);if(!c)return false;
     const next={...changes};
+    if('icPackage' in next&&P.imperialPackages[next.icPackage])Object.assign(next,P.imperialPackages[next.icPackage]);
+    else if(P.imperialPackages[c.icPackage]&&['icWidth','icHeight'].some(key=>key in next&&next[key]!==c[key]))next.icPackage='Custom';
+    if(next.icPackage==='TQFP'&&c.icPackage!=='TQFP'&&!('icPinCount' in next))next.icPinCount=32;
+    if(c.icPackage==='TQFP'&&next.icPackage&&next.icPackage!=='TQFP'&&!('icPinCount' in next)&&c.icPinCount>64)next.icPinCount=6;
+    if(!P.validPackage({...c,...next}))return false;
+    if('componentValue' in next&&(typeof next.componentValue!=='string'||next.componentValue.length>120))return false;
     if(!P.validRf(c,next)||!P.validComponentExtras({...c,...next}))return false;
     if(!P.canSyncRfPorts({...c,...next}))return P.warn('減少路數前，請先移除超出範圍 RF port 的連線。')||false;
     for(const key of ['x','y','width','height','rotation'])if(key in next&&!Number.isFinite(next[key]))return false;
@@ -80,9 +86,10 @@
     if('fontFamily' in next&&!P.fonts.includes(next.fontFamily))return false;
     if('fontSize' in next&&(!Number.isFinite(next.fontSize)||next.fontSize<8||next.fontSize>48))return false;
     if('shape' in next&&!P.shapes.includes(next.shape))return false;
-    for(const key of ['icWidth','icHeight'])if(key in next&&(!Number.isFinite(next[key])||next[key]<1||next[key]>1000))return false;
-    if('icPackage' in next&&!['QFN','BGA','SOT'].includes(next.icPackage))return false;
-    if('icPinCount' in next&&(!Number.isInteger(next.icPinCount)||next.icPinCount<2||next.icPinCount>64||next.icPinCount%2!==0))return false;
+    for(const key of ['icWidth','icHeight'])if(key in next&&(!Number.isFinite(next[key])||next[key]<0.01||next[key]>1000))return false;
+
+    const pins=next.icPinCount??c.icPinCount, pkg=next.icPackage??c.icPackage;
+    if(!Number.isInteger(pins)||(pkg==='TQFP'?(pins<4||pins>256||pins%4!==0):(pins<2||pins>64||pins%2!==0)))return false;
     if('icThickness' in next&&(!Number.isFinite(next.icThickness)||next.icThickness<0.1||next.icThickness>1000))return false;
     let proposedPlacement=null;
     const placement=P.state.placements.find(p=>p.componentId===id);

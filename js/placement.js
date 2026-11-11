@@ -12,6 +12,14 @@
   function reject(message){$('placement-rule-warning').textContent='無法擺放：'+message;return false;}
   function commit(p,changes){const next={...p,...changes};clamp(next);const error=P.boardRules.valid(next);if(error)return reject(error);Object.assign(p,next);$('placement-rule-warning').textContent='';changed();return true;}
   function changed(){P.notify('placement-update');}
+  function cancelPlacement(id){
+    if(!find(id))return;
+    if(drag?.p.componentId===id)drag=null;
+    P.state.placements=P.state.placements.filter(p=>p.componentId!==id);
+    if(selected===id)selected=null;
+    $('placement-rule-warning').textContent='';
+    changed();
+  }
   function place(id){if(find(id)||!P.component(id))return;const c=P.component(id);if(c.icWidth>P.state.board.width||c.icHeight>P.state.board.height){$('placement-message').textContent=`${c.name} 的 IC 尺寸超出電路板，請增加板尺寸。`;return;}const n=P.state.placements.length,p={id:P.uuid(),componentId:id,x:4+(n%8)*18,y:4+Math.floor(n/8)*18,width:P.component(id).icWidth,height:P.component(id).icHeight,rotation:0,side:activeSide()};clamp(p);const position=P.boardRules.findSpace(p);if(!position)return reject('此面沒有足以容納 IC 且符合 Keep Out 的位置。');P.state.placements.push(position);$('placement-rule-warning').textContent='';selected=id;changed();}
   function showPlacement(id){const p=find(id);if(!p)return;selected=id;$('placement-side').value=side(p);$('view-top').click();render();}
   function assignSide(id,face){
@@ -38,7 +46,7 @@
       g.append(node('rect',{x:body.x,y:body.y,width:body.w,height:body.h,rx:.6,fill:'#202b38',stroke:P.colors[c.category]||'#99aabb','stroke-width':.4}));
       // A pin marker and edge pads make the planning footprint distinct from a logical block.
       if(c.icPackage==='QFN')for(let i=1;i<=4;i++){g.append(node('rect',{x:-.8,y:h*i/5-.35,width:.8,height:.7,fill:'#c1cbd1'}),node('rect',{x:w,y:h*i/5-.35,width:.8,height:.7,fill:'#c1cbd1'}));}
-      g.append(node('circle',{cx:1.3,cy:1.3,r:.45,fill:'#f5d17d'}),node('text',{x:w/2,y:h/2,'text-anchor':'middle','font-size':Math.min(2,w/Math.max(c.name.length*.6,1)),fill:'#eef4fa'},c.name),node('text',{x:w/2,y:h/2+2.5,'text-anchor':'middle','font-size':1.2,fill:'#a1b4c7'},`${p.width} × ${p.height} mm · ${p.rotation}°`),node('title',{},`${c.name}\n${c.partNumber||'虛擬 IC'} · ${c.icPackage}${c.icPackage==='SOT'?' '+c.icPinCount+' PIN':''}\n${P.componentPorts(c.id).length} 個介面 Port（非實體腳位）`));parts.append(g);
+      g.append(node('circle',{cx:1.3,cy:1.3,r:.45,fill:'#f5d17d'}),node('text',{x:w/2,y:h/2,'text-anchor':'middle','font-size':Math.min(2,w/Math.max(c.name.length*.6,1)),fill:'#eef4fa'},c.name),node('text',{x:w/2,y:h/2+2.5,'text-anchor':'middle','font-size':1.2,fill:'#a1b4c7'},`${p.width} × ${p.height} mm · ${p.rotation}°`),node('title',{},`${c.name}\n${c.partNumber||'虛擬 IC'} · ${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+' PIN':''}\n${P.componentPorts(c.id).length} 個介面 Port（非實體腳位）`));parts.append(g);
     }
     $('placement-message').textContent=`PCB ${board.width} × ${board.height} mm · 面積 ${board.width*board.height} mm² · ${activeSide()==='top'?'Top 上表面':'Bottom 下表面'}（共用 Top 視角 XY 座標） · 已擺放 ${P.state.placements.length} / ${P.state.components.length} 顆 IC · ${collisions.size?collisions.size+' 顆元件重疊，請調整位置':'無元件重疊'} · 左上角為原點。虛擬尺寸供規劃使用。`;
     const inventory=$('inventory');inventory.replaceChildren();
@@ -48,13 +56,14 @@
     for(const c of P.state.components){
       const p=find(c.id),row=document.createElement('tr');row.dataset.componentId=c.id;row.classList.toggle('selected',selected===c.id);
       const title=document.createElement('td'),name=document.createElement('button');name.className='inventory-select';name.textContent=c.name;name.disabled=!p;name.title=p?'選取並顯示此 IC':'請先選擇 TOP 或 Bottom';name.onclick=()=>showPlacement(c.id);title.append(name);row.append(title);
-      const detail=document.createElement('td');detail.textContent=`${c.icPackage}${c.icPackage==='SOT'?' '+c.icPinCount+' PIN':''} · ${c.icWidth} × ${c.icHeight} × ${c.icThickness}`;row.append(detail);
+      const detail=document.createElement('td');detail.textContent=`${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+' PIN':''} · ${c.icWidth} × ${c.icHeight} × ${c.icThickness}`;row.append(detail);
       const status=document.createElement('td');status.className='placement-side-status';status.textContent=p?side(p).toUpperCase():'未擺放';row.append(status);
       const actions=document.createElement('td');
       for(const face of ['top','bottom']){
         const button=document.createElement('button');button.dataset.placeSide=face;button.textContent=`放到 ${face==='top'?'TOP':'Bottom'}`;button.setAttribute('aria-label',`${c.name} 放到 ${face.toUpperCase()}`);button.setAttribute('aria-pressed',String(!!p&&side(p)===face));
         button.onclick=()=>assignSide(c.id,face);actions.append(button);
       }
+      const cancel=document.createElement('button');cancel.dataset.cancelPlacement=c.id;cancel.textContent='取消擺放';cancel.disabled=!p;cancel.setAttribute('aria-label',`${c.name} 取消擺放`);cancel.title='將 IC 移回未擺放狀態';cancel.onclick=()=>cancelPlacement(c.id);actions.append(cancel);
       row.append(actions);rows.append(row);
     }
     table.append(rows);inventory.append(table);
@@ -66,7 +75,7 @@
     for(const [value,label] of [['top','Top 上表面'],['bottom','Bottom 下表面']]){const option=document.createElement('option');option.value=value;option.textContent=label;face.append(option);}face.value=side(p);
     face.onchange=()=>{const value=face.value;if(commit(p,{side:value})){$('placement-side').value=value;render();}else face.value=side(p);};faceLabel.append(face);editor.append(faceLabel);
     for(const [key,label] of [['x','X mm'],['y','Y mm'],['width','IC 長 mm'],['height','IC 寬 mm'],['icThickness','IC 高 mm']]){const l=document.createElement('label'),input=document.createElement('input');l.textContent=label;input.type='number';input.step='.1';input.min=key==='width'||key==='height'?1:0;input.value=key==='icThickness'?P.component(p.componentId).icThickness:p[key];if(['width','height','icThickness'].includes(key)){input.readOnly=true;input.title='請在 Architecture 元件屬性修改 IC 尺寸';}input.onchange=()=>{if(['width','height','icThickness'].includes(key))return;const value=Number(input.value),next={...p,[key]:value};const {w,h}=size(next);if(!Number.isFinite(value)||value<Number(input.min)||w>board.width||h>board.height){render();return;}commit(p,next);};l.append(input);editor.append(l);}
-    for(const [label,action] of [['旋轉 90°',()=>{const next={...p,rotation:(p.rotation+90)%360},s=size(next);if(s.w>board.width||s.h>board.height)return;commit(p,next);}],['移回待擺清單',()=>{P.state.placements=P.state.placements.filter(x=>x!==p);selected=null;changed();}]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;editor.append(b);}
+    for(const [label,action] of [['旋轉 90°',()=>{const next={...p,rotation:(p.rotation+90)%360},s=size(next);if(s.w>board.width||s.h>board.height)return;commit(p,next);}],['取消擺放',()=>cancelPlacement(p.componentId)]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;editor.append(b);}
   }
   function point(e){const r=svg.getBoundingClientRect(),b=P.state.board,scale=Math.min(r.width/(b.width+10),r.height/(b.height+10));return {x:(e.clientX-r.left-(r.width-(b.width+10)*scale)/2)/scale-5,y:(e.clientY-r.top-(r.height-(b.height+10)*scale)/2)/scale-5};}
   svg.addEventListener('pointerdown',e=>{if(e.button!==0)return;const g=e.target.closest('[data-component]');selected=g?.dataset.component||null;const p=find(selected);if(p){e.preventDefault();drag={p,start:point(e),x:p.x,y:p.y};svg.setPointerCapture?.(e.pointerId);}render();});

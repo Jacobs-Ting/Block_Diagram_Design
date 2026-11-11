@@ -128,8 +128,21 @@
       const input=field(panel,label,c[key],value=>{P.update(c.id,{[key]:value});if(key==='name')header.querySelector('h2').textContent=value;if(key==='category')header.querySelector('.chip-icon').textContent=P.icons[value];},{name:key,required:key==='name',choices:key==='category'?Object.keys(P.groups):null});
       input.addEventListener('blur',()=>{if(key==='name'&&!input.value.trim()){input.value=c.name;input.setCustomValidity('');}});
     }
-    panel.append(text('h3','section-title','IC 封裝'));
-    field(panel,'IC 封裝',c.icPackage,value=>{P.update(c.id,{icPackage:value},'ic-package');render();},{name:'icPackage',commit:true,choices:['QFN','BGA','SOT']});
+    panel.append(text('h3','section-title','元件封裝'));
+    if(P.isPassive(c))field(panel,'元件值 / 規格',c.componentValue,value=>P.update(c.id,{componentValue:value}),{name:'componentValue',placeholder:c.type==='R'?'例如 10 kΩ ±1%':c.type==='L'?'例如 10 µH':'例如 100 nF / 50 V'});
+    field(panel,P.isPassive(c)?'英制封裝':'IC 封裝',c.icPackage,value=>{P.update(c.id,{icPackage:value},'ic-package');render();},{name:'icPackage',commit:true,choices:P.packageChoices(c).map(v=>v==='Custom'?[v,'自訂規格']:v)});
+    if(P.isPassive(c))panel.append(text('p','inspector-note','英制代碼以 0.01 inch 換算標稱長寬；實際尺寸請依料件規格調整，修改長寬會切換為自訂。'));
+    if(c.icPackage==='Custom')field(panel,'自訂封裝規格',c.packageSpec,value=>P.update(c.id,{packageSpec:value}),{name:'packageSpec',placeholder:'輸入封裝名稱或規格，並於下方設定實體尺寸'});
+    if(c.icPackage==='TQFP'){
+      const pinInput=field(panel,'TQFP 總 PIN 腳數',c.icPinCount,(value,input)=>{
+        const ok=P.update(c.id,{icPinCount:value},'ic-package');
+        input.setCustomValidity(ok?'':'請輸入 4–256 的四倍數。');
+        if(!ok){input.reportValidity();return;}
+        summary.textContent=`每側 ${value/4} 腳（總計 ${value} 腳）`;
+      },{name:'icPinCount',number:true,min:4,max:256,step:4,commit:true});
+      pinInput.addEventListener('blur',()=>{pinInput.value=c.icPinCount;pinInput.setCustomValidity('');});
+      const summary=text('p','inspector-note',`每側 ${c.icPinCount/4} 腳（總計 ${c.icPinCount} 腳）；外形與腳位為規劃示意。`);panel.append(summary);
+    }
     if(c.icPackage==='SOT'){
       const pinInput=field(panel,'SOT 總 PIN 腳數',c.icPinCount,(value,input)=>{
         const ok=P.update(c.id,{icPinCount:value},'ic-package');
@@ -149,7 +162,8 @@
         input.setCustomValidity(ok?'':'IC 尺寸超出目前電路板，請先增加板尺寸。');
         if(!ok){input.reportValidity();return;}
         area.value=Number((c.icWidth*c.icHeight).toFixed(4));
-      },{name:key,number:true,min:key==='icThickness'?0.1:1,max:1000,step:0.1,commit:true});
+        if(P.isPassive(c))render();
+      },{name:key,number:true,min:key==='icThickness'?0.1:0.01,max:1000,step:0.001,commit:true});
       input.addEventListener('blur',()=>{input.value=c[key];input.setCustomValidity('');});
     }
     panel.append(icSizes,area.parentElement,text('p','inspector-note','面積 = 長 × 寬；Placement 的 3D IC 使用相同長、寬、高（mm）。下方 Width / Height 僅控制架構圖方塊大小。'));

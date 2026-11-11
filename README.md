@@ -145,6 +145,8 @@ Board width/height/thickness inputs retain uncommitted edits across view updates
 
 The component list now appears above the Placement canvas and lists every Architecture component, its package/dimensions and current placement status. Each row has **放到 TOP** and **放到 Bottom** actions: unplaced ICs are created on the chosen side; existing ICs move to that side without changing their XY coordinates or rotation. Either action selects the IC and opens its face in the 2D placement editor. Clicking an already placed IC's name selects it. The upper face selector is a **俯視檢視面** filter, while the optional bulk action places only unplaced ICs on the current face.
 
+Click **取消擺放** in an IC's row or selected IC editor to return it to the unplaced state. This removes only its PCB placement and preserves the Architecture component, ports and connections. The row action is disabled for unplaced ICs; choose TOP or Bottom to place the IC again.
+
 
 ### RF Link Budget (page 04)
 

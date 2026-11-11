@@ -19,10 +19,10 @@
     box(0,0,b.width,b.height,0,b.thickness,'#28775e',null,'PCB');
     for(const p of P.state.placements){
       const c=P.component(p.componentId);if(!c)continue;
-      const geometry=P.icGeometry(c),body=P.icRect(geometry.body,c,p.rotation),label=`${c.name}\n${c.icPackage}${c.icPackage==='SOT'?' · '+c.icPinCount+' pins':''}\n${c.icWidth} × ${c.icHeight} × ${c.icThickness} mm`;
+      const geometry=P.icGeometry(c),body=P.icRect(geometry.body,c,p.rotation),label=`${c.name}\n${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' · '+c.icPinCount+' pins':''}\n${c.icWidth} × ${c.icHeight} × ${c.icThickness} mm`;
       const mount=p.side||'top',z=mount==='bottom'?-c.icThickness:b.thickness;
       box(p.x+body.x,p.y+body.y,body.w,body.h,z,c.icThickness,'#111111',c.id,label,false,mount);
-      geometry.pads.forEach((pad,index)=>{const r=P.icRect(pad,c,p.rotation);const leadHeight=Math.min(.25,c.icThickness*.35);box(p.x+r.x,p.y+r.y,r.w,r.h,mount==='bottom'?-leadHeight:b.thickness,leadHeight,'#bbc3cc',c.id,`${c.name} · SOT lead ${index+1}`,true,mount);});
+      geometry.pads.forEach((pad,index)=>{const r=P.icRect(pad,c,p.rotation);const leadHeight=Math.min(.25,c.icThickness*.35);box(p.x+r.x,p.y+r.y,r.w,r.h,mount==='bottom'?-leadHeight:b.thickness,leadHeight,'#bbc3cc',c.id,`${c.name} · ${c.icPackage} lead ${index+1}`,true,mount);});
     }
     if($('show-ratsnest').checked)for(const e of P.state.connections){const a=P.state.placements.find(p=>p.componentId===e.source.componentId),c=P.state.placements.find(p=>p.componentId===e.target.componentId);if(!a||!c)continue;const sa=P.placement.size(a),sc=P.placement.size(c),v=project(a.x+sa.w/2,a.y+sa.h/2,a.side==='bottom'?-P.component(a.componentId).icThickness-.1:b.thickness+P.component(a.componentId).icThickness+.1),w=project(c.x+sc.w/2,c.y+sc.h/2,c.side==='bottom'?-P.component(c.componentId).icThickness-.1:b.thickness+P.component(c.componentId).icThickness+.1);((a.side||'top')==='bottom'&&(c.side||'top')==='bottom'?bottomFaces:faces).push({depth:(v.depth+w.depth)/2,node:node('line',{x1:v.x,y1:v.y,x2:w.x,y2:w.y,stroke:P.interfaceColors[e.interfaceType]||'#ccc','stroke-width':.25,'stroke-dasharray':'1 1','pointer-events':'none'})});}
     // Keep each mounting side separated by the opaque PCB. Centroid sorting

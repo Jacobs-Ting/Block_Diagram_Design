@@ -27,7 +27,7 @@ function editor(){
 test('Page loads with demo, selection/property editing and tabs preserve the graph without console errors',()=>{
   const E=editor(),{P,d,svg,pointer,input,field,key}=E;
   assert.equal(d.querySelectorAll('.block').length,15);assert.equal(d.querySelectorAll('.connection').length,20);
-  assert.equal(d.querySelectorAll('.component-item').length,42);
+  assert.equal(d.querySelectorAll('.component-item').length,45);
   const sdr=P.state.components.find(c=>c.type==='SDR'),trx=P.state.components.find(c=>c.type==='RF Transceiver');
   assert.equal(d.querySelectorAll(`[data-id="${sdr.id}"] .connected[data-side="right"]`).length,4);
   assert.equal(d.querySelectorAll(`[data-id="${trx.id}"] .connected[data-side="left"]`).length,4);
@@ -686,5 +686,35 @@ test('Keep Out rejection is atomic for board resize, IC resize and per-IC face a
   assert.equal(P.update(a.id,{icWidth:40}),false);assert.equal(a.icWidth,12);assert.equal(JSON.stringify(P.state.placements),before);
   assert.equal(P.update(a.id,{keepOutOpposite:true}),true);assert.equal(P.placement.commit(q,{side:'bottom',x:p.x+20,y:p.y}),true);
   assert.equal(P.placement.commit(q,{x:p.x,y:p.y}),false);assert.equal(q.x,p.x+20);
+  E.clean();
+});
+
+test('Passive packages and Connector support custom specifications and small placement round trips',()=>{
+  const E=editor(),{P,d,input,field}=E;P.clearCanvas();
+  for(const type of ['R','L','C']){
+    d.querySelector('.component-item[data-name="'+type+'"]').click();
+    const c=P.component(P.ui.selected);assert.equal(c.type,type);
+    assert.equal(c.icPackage,'0402');
+    assert.deepEqual([...field('英制封裝').options].map(o=>o.value),['0201','0402','0603','0804','1005','TQFP','Custom']);
+    for(const code of ['0201','0402','0603','0804','1005']){
+      input(field('英制封裝'),code,'change');assert.equal(c.icPackage,code);
+      assert.equal(c.icWidth,Number((Number(code.slice(0,2))*.254).toFixed(3)));
+    }
+    input(field('英制封裝'),'0201','change');
+    input(field('元件值 / 規格'),'10 kΩ');
+    P.state.placements.push({id:P.uuid(),componentId:c.id,x:1,y:1,width:c.icWidth,height:c.icHeight,rotation:0,side:'top'});
+    assert.equal(P.importProjectText(JSON.stringify(P.state)),true);
+    P.select(c.id);input(field('IC 長 (mm)'),0.7,'change');
+    assert.equal(P.component(c.id).icPackage,'Custom');
+    input(field('自訂封裝規格'),'特殊封裝');
+    assert.equal(P.state.placements.find(p=>p.componentId===c.id).width,0.7);
+  }
+  const connector=P.addComponent('Connector');P.select(connector.id);
+  assert.equal(connector.category,'Connector');assert.equal(connector.icPackage,'Custom');
+  input(field('自訂封裝規格'),'2.54 mm header');
+  assert.equal(P.importProjectText(JSON.stringify(P.state)),true);
+  assert.equal(P.component(connector.id).packageSpec,'2.54 mm header');
+  assert.equal(P.state.components[0].componentValue,'10 kΩ');
+  assert.equal(P.state.components[0].packageSpec,'特殊封裝');
   E.clean();
 });

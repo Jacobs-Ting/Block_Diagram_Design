@@ -129,3 +129,36 @@ test('Demo is an independently serialized graph, with CPU five neighbors and clo
   assert.equal(P.addConnection({componentId:'missing',anchor:'top'},end(cpu)),null);
 });
 
+
+test('R/L/C imperial packages update placement atomically and preserve custom specifications on load',()=>{
+  const P=setup();
+  const context={window:{Planner:P}};vm.createContext(context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/storage.js'),'utf8'),context);
+  for(const type of ['R','L','C']){
+    const c=P.addComponent(type);assert.equal(c.category,'Passive');assert.equal(c.icPackage,'0402');
+    const p={id:P.uuid(),componentId:c.id,x:2,y:2,width:c.icWidth,height:c.icHeight,rotation:0,side:'top'};P.state.placements.push(p);
+    for(const code of ['0201','0402','0603','0804','1005']){
+      assert.equal(P.update(c.id,{icPackage:code}),true);
+      assert.equal(c.icWidth,Number((Number(code.slice(0,2))*.254).toFixed(3)));assert.equal(p.width,c.icWidth);
+      assert.equal(P.storage.validate(JSON.parse(JSON.stringify(P.state))).components.at(-1).icPackage,code);
+    }
+    assert.equal(P.update(c.id,{icWidth:0}),false);
+    assert.equal(P.update(c.id,{icWidth:0.7,packageSpec:'custom',componentValue:'10k'}),true);
+    assert.equal(c.icPackage,'Custom');assert.equal(p.width,0.7);
+    const saved=P.storage.validate(JSON.parse(JSON.stringify(P.state))).components.at(-1);
+    assert.equal(saved.packageSpec,'custom');assert.equal(saved.componentValue,'10k');
+  }
+  const c=P.addComponent('Connector');assert.equal(c.category,'Connector');assert.equal(c.icPackage,'Custom');
+});
+
+test('TQFP is available to every category and has four-sided rotating leads',()=>{
+ const P=setup(),context={window:{Planner:P}};vm.createContext(context);
+ for(const f of ['ic-package','storage'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js',f+'.js'),'utf8'),context);
+ for(const type of ['CPU','R','Connector']){
+  const c=P.addComponent(type);assert.ok(P.packageChoices(c).includes('TQFP'));assert.ok(P.update(c.id,{icPackage:'TQFP'}));assert.equal(c.icPinCount,32);
+  assert.equal(P.update(c.id,{icPinCount:30}),false);assert.ok(P.update(c.id,{icPinCount:100}));
+  const geo=P.icGeometry(c);assert.equal(geo.pads.length,100);
+  for(const rot of [0,90,180,270])for(const pad of geo.pads){const r=P.icRect(pad,c,rot),w=rot%180?c.icHeight:c.icWidth,h=rot%180?c.icWidth:c.icHeight;assert.ok(r.x>=-1e-9&&r.y>=-1e-9&&r.x+r.w<=w+1e-9&&r.y+r.h<=h+1e-9);}
+  assert.equal(P.storage.validate(JSON.parse(JSON.stringify(P.state))).components.at(-1).icPinCount,100);
+ }
+});
