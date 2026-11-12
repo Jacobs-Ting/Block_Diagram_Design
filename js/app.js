@@ -33,7 +33,7 @@
     if(type==='clear'){document.getElementById('status').textContent='畫面已清除';document.getElementById('coordinates').textContent='X —  Y —';}
     if(type==='copy')document.getElementById('status').textContent='已複製選取物件';
     if(type==='paste')document.getElementById('status').textContent='已貼上副本';
-    const projectMessages={'project-save':'專案已儲存於此瀏覽器','project-saved-load':'已載入本機存檔','project-import':'JSON 專案匯入完成','project-export':'JSON 專案已匯出','png-export':'完整工作區 PNG 已匯出','project-load':'專案資料已載入'};
+    const projectMessages={'project-save':'專案已儲存於此瀏覽器','project-saved-load':'已載入本機存檔','project-import':'JSON 專案匯入完成','project-export':'JSON 專案已匯出','png-export':'完整工作區 PNG 已匯出','pptx-export':'PPT 報告已匯出（架構圖、Placement Top／Bottom、Link Budget）','project-load':'專案資料已載入'};
     if(projectMessages[type])document.getElementById('status').textContent=projectMessages[type];
     if(P.ui.mode==='select')document.getElementById('canvas-help').textContent='選取圖形後拖曳上方圓點旋轉 · 空白處拖曳框選 · Shift 點擊多選 · Ctrl+C / Ctrl+V 複製貼上 · Delete 刪除';
   }

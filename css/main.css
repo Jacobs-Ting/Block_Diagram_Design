@@ -7,3 +7,5 @@
 .budget-diagnostic{border:1px solid #bc9259;background:#bd8c2410;border-radius:6px;padding:16px;margin:20px 0}.budget-diagnostic h2{margin-top:0!important;font-size:16px!important}.budget-diagnostic p{line-height:1.7;color:var(--muted)}
 .pcb-keepout{fill:#f5b85b;fill-opacity:.12;stroke:#f5b85b;stroke-width:.3;stroke-dasharray:1.2 .8}.pcb-keepout.opposite{fill:#d68df1;stroke:#d68df1}#placement-rule-warning{margin:8px 32px;color:#f2b47c;line-height:1.7}
 .placement-connection-toggle{align-self:center;border:1px solid var(--line);padding:9px 12px;border-radius:5px;cursor:pointer}.placement-tools .placement-connection-toggle{color:var(--text)}
+.topbar-export{margin-left:auto;font-size:12px;padding:8px 14px;border-color:#3d6a63;color:var(--accent);background:#173029}.topbar-export:hover{background:#1e3f37;border-color:var(--accent)}.topbar-export+.phase{margin-left:0}
+:root[data-theme="light"] .topbar-export{background:#e2f3ef;color:#087f70;border-color:#087f70}

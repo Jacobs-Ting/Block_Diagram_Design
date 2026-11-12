@@ -45,14 +45,32 @@
   P.loadSavedProject=()=>{try{const value=localStorage.getItem(storageKey);if(!value)return P.warn('目前沒有本機存檔。');load(JSON.parse(value));P.notify('project-saved-load');return true;}catch(error){P.warn('無法載入存檔：'+error.message);return false;}};
   P.exportProject=()=>{download(new Blob([JSON.stringify(P.state,null,2)],{type:'application/json'}),filename('json'));P.notify('project-export');};
   P.importProjectText=text=>{try{load(JSON.parse(text));P.notify('project-import');return true;}catch(error){P.warn('匯入失敗：'+error.message);return false;}};
-  P.buildExportSvg=()=>{
-    const source=document.getElementById('canvas'),copy=source.cloneNode(true),{width,height}=P.state.workspace;
-    copy.setAttribute('xmlns','http://www.w3.org/2000/svg');copy.setAttribute('viewBox',`0 0 ${width} ${height}`);copy.setAttribute('width',width);copy.setAttribute('height',height);
+  // Browsers block reading stylesheet rules when index.html is opened from file://, so exported
+  // SVG cannot rely on an embedded <style>. Copy the resolved paint/text styles of every live
+  // element onto its clone instead (walk both trees in parallel right after cloneNode).
+  const exportStyleProps=['display','visibility','opacity','fill','fill-opacity','fill-rule','stroke','stroke-width','stroke-opacity','stroke-dasharray','stroke-dashoffset','stroke-linecap','stroke-linejoin','paint-order','font-family','font-size','font-weight','font-style','text-anchor','dominant-baseline','letter-spacing','white-space','color','background-color','border','border-radius','padding','line-height','text-align','overflow-wrap','word-break','box-sizing'];
+  P.inlineSvgStyles=(source,copy)=>{
+    const a=[source,...source.querySelectorAll('*')],b=[copy,...copy.querySelectorAll('*')];
+    if(a.length!==b.length)return copy;
+    // Export without selection highlight: drop .selected while styles are resolved, then restore.
+    const selected=a.filter(n=>n.classList?.contains('selected'));selected.forEach(n=>n.classList.remove('selected'));
+    try{for(let i=0;i<a.length;i++){
+      const tag=a[i].localName;if(['defs','style','title','desc','marker','pattern','clipPath','linearGradient','radialGradient','stop'].includes(tag)&&i)continue;
+      const computed=getComputedStyle(a[i]);let text=b[i].getAttribute('style')||'';
+      for(const prop of exportStyleProps){const value=computed.getPropertyValue(prop);if(value)text+=`;${prop}:${value}`;}
+      b[i].setAttribute('style',text.replace(/^;/,''));
+    }}finally{selected.forEach(n=>n.classList.add('selected'));}
+    return copy;
+  };
+  P.buildExportSvg=(box)=>{
+    // Optional box {x,y,width,height} crops the export (used by the PPT report); default is the full workspace.
+    const source=document.getElementById('canvas'),copy=P.inlineSvgStyles(source,source.cloneNode(true)),{x=0,y=0,width,height}=box||P.state.workspace;
+    copy.setAttribute('xmlns','http://www.w3.org/2000/svg');copy.setAttribute('viewBox',`${x} ${y} ${width} ${height}`);copy.setAttribute('width',width);copy.setAttribute('height',height);
     copy.querySelectorAll('.selection-box,#connection-preview,.free-line-preview,.resize-handles,.rotation-controls,.text-handles,.connection-point,.edge-hit,.edge-halo,.free-line-hit,.free-line-halo,.line-handle').forEach(node=>node.remove());
     copy.querySelectorAll('.selected').forEach(node=>node.classList.remove('selected'));
     let css='';for(const sheet of document.styleSheets){try{css+=[...sheet.cssRules].map(rule=>rule.cssText).join('\n');}catch{}}
     const style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent=css;copy.querySelector('defs').append(style);
-    const background=document.createElementNS('http://www.w3.org/2000/svg','rect');background.setAttribute('width',width);background.setAttribute('height',height);background.setAttribute('fill',P.state.appearance?.theme==='light'?'#f4f7fa':'#111923');copy.insertBefore(background,copy.querySelector('#canvas-background'));
+    const background=document.createElementNS('http://www.w3.org/2000/svg','rect');background.setAttribute('x',x);background.setAttribute('y',y);background.setAttribute('width',width);background.setAttribute('height',height);background.setAttribute('fill',P.state.appearance?.theme==='light'?'#f4f7fa':'#111923');copy.insertBefore(background,copy.querySelector('#canvas-background'));
     return new XMLSerializer().serializeToString(copy);
   };
   P.exportPNG=()=>new Promise((resolve,reject)=>{

@@ -39,6 +39,17 @@ Phase 1 Engineering Graph MVP。直接以 Chrome / Edge 開啟 `index.html`，�
 - **PNG**：輸出完整 Architecture 工作區，不受目前 Pan／Zoom 視角影響；選取框、Handle、Port 控制點與預覽線不會出現在圖片中。
 - PNG 以工作區背景色輸出。工作區任一邊超過 8192 時會等比例縮小，以控制記憶體使用量。
 
+## 匯出 PPT 報告
+
+頂端列右側 **匯出 PPT** 可在任何分頁使用，下載 `<專案名稱>-report.pptx`（16:9，PowerPoint／Keynote／LibreOffice 可開啟），內容：
+
+1. **封面**：專案名稱、方塊／連線／已擺放 IC／RF 路徑數量、PCB 尺寸與匯出時間。
+2. **方塊架構圖**：Architecture 畫布的高解析度圖片，自動裁切到實際物件範圍，不受目前 Pan／Zoom 影響；選取框與控制點不會出現。沿用目前深色／淺色主題。
+3. **PCB 擺件 · Top / Bottom**：兩面各一頁俯視圖（含 Keep Out 與「顯示連線」設定下的虛線），右側列出該面 IC 的封裝、X/Y、尺寸、旋轉與高度；元件多時自動分頁。Bottom 與編輯器相同，使用 Top 視角座標（未鏡像）。
+4. **RF Link Budget**：Tx 最大功率與 Rx 靈敏度彙總表（路徑、結果、Gain、NF／限制來源、狀態、警告），以及每條路徑的逐級明細（每頁兩條）。使用目前專案的頻寬與 SNR 設定。
+
+PPT 為匯出當下的快照；修改後請重新匯出。App 仍無第三方依賴，PPTX 由內建的 OOXML 產生器建立。
+
 ## 方塊顏色
 
 選取任一方塊後，可在右側 Properties 的 **Block Color** 使用色彩選擇器即時設定填滿色；「使用預設色」恢復 `#1c2938`。顏色會隨複製貼上、存檔、JSON 與 PNG 保留。
