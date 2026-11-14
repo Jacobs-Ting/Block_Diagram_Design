@@ -184,6 +184,59 @@
       rows.push([c.name,c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage+(['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+'P':''),`${p.x}, ${p.y}`,`${p.width} × ${p.height}`,p.rotation+'°',c.icThickness]);}
     return rows;
   }
+  // Flow several titled tables down slides, splitting long tables across pages.
+  function flowTables(add,title,subtitle,blocks,top=1.15,bottom=6.95){
+    let els=[],y=top,page=0;const flush=()=>{if(els.length){page++;add(title+(page>1?`（續 ${page}）`:''),subtitle,els);}els=[];y=top;};
+    for(const b of blocks){
+      const headH=.42,minH=headH+rowHeight(b.rows[0],b.cols,b.size)+(b.rows[1]?rowHeight(b.rows[1],b.cols,b.size):.35);
+      if(y+minH>bottom)flush();
+      let rows=b.rows;let first=true;
+      while(rows.length){
+        if(!first)flush();
+        els.push({type:'shape',x:.45,y,w:12.4,h:.36,text:[[{text:b.title+(first?'':'（續）'),bold:true,size:13,color:'203D55'},{text:b.note?'   '+b.note:'',size:9,color:'6B7A8C'}]],anchor:'ctr',inset:0});y+=headH;
+        if(rows.length===1&&b.empty){els.push({type:'shape',x:.45,y,w:12.4,h:.42,text:b.empty,size:10,color:'6B7A8C',fill:'F3F6F9',anchor:'ctr',inset:.12});y+=.6;break;}
+        const pg=paginate(rows,b.cols,b.size,bottom-y)[0];
+        els.push({type:'table',x:.45,y,cols:b.cols,size:b.size,band:true,rows:pg.rows,heights:pg.heights,align:b.align});
+        y+=pg.heights.reduce((a,c)=>a+c,0)+.25;rows=pg.rows.length>1?[rows[0],...rows.slice(pg.rows.length)]:[];if(rows.length===1)rows=[];first=false;
+      }
+    }
+    flush();
+  }
+  function prdSlides(add,a,s){
+    const n=(v,d=2)=>Number.isFinite(v)?String(Number(v.toFixed(d))):'—';
+    const dist=km=>!Number.isFinite(km)?'—':km>=1?`${n(km)} km`:`${n(km*1000,km<0.01?2:0)} m`;
+    const gb=v=>!Number.isFinite(v)?'—':v>=1?`${n(v)} GB`:`${n(v*1024,1)} MB`;
+    const todo=v=>v===null||v===undefined||v===''?{text:'待補',color:'C2410C',bold:true}:String(v);
+    const set=a.settings,ok=a.rows.filter(r=>r.valid).length;
+    // 1. Overview
+    const cards=[['方塊總數',String(s.components.length)],['處理器',String(a.processors.length)],['DDR 總容量',a.ddr.length?gb(a.totals.ddrGB):'—'],['儲存記憶體',a.storage.length?gb(a.totals.storageGB):'—'],['RF 路徑完成',`${ok} / ${a.rows.length}`],['最遠對連距離',a.ranges.length?dist(a.totals.bestKm):'—']];
+    const els=cards.flatMap(([label,value],i)=>{const x=.45+i*2.09;return [{type:'shape',x,y:1.2,w:1.94,h:1.05,fill:'F3F6F9',line:'D5DCE3'},{type:'shape',x:x+.15,y:1.27,w:1.7,h:.32,text:label,size:10,color:'5B6876',inset:0,anchor:'ctr'},{type:'shape',x:x+.15,y:1.6,w:1.7,h:.55,text:value,size:22,bold:true,color:i===5?'1F8A70':'10161E',inset:0,anchor:'ctr'}];});
+    const comp=[['類別','數量','方塊'],...Object.entries(a.byCategory).map(([k,v])=>[k,String(v.length),v.join('、')])];
+    const compCols=[1.4,.65,5.45],compPage=paginate(comp,compCols,9.5,4.2)[0];
+    els.push({type:'shape',x:.45,y:2.5,w:7.5,h:.36,text:'系統組成',bold:true,size:13,color:'203D55',inset:0,anchor:'ctr'});
+    if(comp.length>1)els.push({type:'table',x:.45,y:2.92,cols:compCols,size:9.5,band:true,rows:compPage.rows,heights:compPage.heights,align:[null,'r',null]});
+    else els.push({type:'shape',x:.45,y:2.92,w:7.5,h:.5,text:'第一頁尚無方塊。',size:10,color:'6B7A8C',fill:'F3F6F9',anchor:'ctr',inset:.12});
+    const gaps=a.missing.slice(0,14),more=a.missing.length-gaps.length;
+    els.push({type:'shape',x:8.25,y:2.5,w:4.6,h:.36,text:`待補資料 / Open items（${a.missing.length}）`,bold:true,size:13,color:a.missing.length?'C2410C':'1F8A70',inset:0,anchor:'ctr'});
+    els.push({type:'shape',x:8.25,y:2.92,w:4.6,h:4.05,fill:'FFF7ED',line:'F3D3B0',inset:.15,size:9.5,color:'7C2D12',text:a.missing.length?[...gaps.map(m=>'• '+m),...(more>0?[`…另 ${more} 項，詳見網頁第三頁`]:[])]:['所有 PRD 欄位皆已填寫。']});
+    add('PRD 分析 · 產品總覽','由第一頁架構圖自動彙整；「待補」欄位請在 Architecture 的 Properties 填寫',els);
+    // 2. Compute & memory specs
+    const memRows=list=>[['方塊','類型','Vendor','Part number','容量','速率 / 頻率','電壓','連接處理器'],...list.map(m=>[m.c.name,m.c.type,m.c.vendor||'—',todo(m.c.partNumber),Number.isFinite(m.c.memoryCapacity)?`${m.c.memoryCapacity} ${m.c.memoryUnit}`:todo(null),m.c.frequency||'—',m.c.voltage||'—',m.host.join('、')||'—'])];
+    const memCols=[1.9,1,1.4,2.2,1.1,2.1,1,1.7];
+    flowTables(add,'PRD 分析 · 運算與記憶體規格','CPU 核心數／時脈取自 CPU 規格欄位；容量取自記憶體 / 儲存容量欄位；速率取自 Frequency 欄位',[
+      {title:'CPU / 處理器規格',note:'Processor 類別方塊（CPU／SoC／MCU／FPGA）',cols:[1.9,.9,1.3,2.1,.85,1.15,.95,1.15,2.1],size:9.5,empty:'架構圖中沒有 Processor 類別方塊。',align:[null,null,null,null,'r','r',null,null,null],
+        rows:[['方塊','類型','Vendor','Part number','核心數','時脈','電壓','功耗','連接記憶體'],...a.processors.map(p=>[p.c.name,p.c.type,p.c.vendor||'—',todo(p.c.partNumber),p.c.type==='CPU'?todo(p.cores):String(p.cores??'—'),p.clockMHz?`${n(p.clockMHz)} MHz`:(p.c.type==='CPU'?todo(null):'—'),p.c.voltage||'—',p.c.power||'—',p.memory.join('、')||'—'])]},
+      {title:'DDR 規格',note:a.ddr.length?`總容量 ${gb(a.totals.ddrGB)}`:'',cols:memCols,size:9.5,rows:memRows(a.ddr),empty:'架構圖中沒有 DDR 方塊。'},
+      {title:'記憶體 · 儲存規格（eMMC / Flash / EEPROM）',note:a.storage.length?`總容量 ${gb(a.totals.storageGB)}`:'',cols:memCols,size:9.5,rows:memRows(a.storage),empty:'架構圖中沒有 eMMC／Flash／EEPROM 方塊。'}
+    ]);
+    // 3. Range estimate
+    const assumptions=`頻率 ${s.linkBudget.frequencyMHz?n(s.linkBudget.frequencyMHz)+' MHz（手動）':'自動偵測'} · Tx 天線 ${n(set.txAntennaGainDbi)} dBi · Rx 天線 ${n(set.rxAntennaGainDbi)} dBi · Fade margin ${n(set.fadeMarginDb)} dB · BW ${s.linkBudget.bandwidthMHz} MHz · SNR ${s.linkBudget.snrDb} dB`;
+    const rangeEls=[{type:'shape',x:.45,y:1.15,w:12.4,h:.72,fill:'F3F6F9',line:'D5DCE3',inset:.12,size:10,color:'1F2933',anchor:'ctr',text:[[{text:'模型：',bold:true},{text:'兩台相同裝置對連，A 的 Tx 路徑 → B 的 Rx 路徑，自由空間視距。'}],[{text:'MAPL = P_tx + G_tx + G_rx − Sensitivity；可用路損 = MAPL − Fade margin；FSPL(dB) = 20·log₁₀(d_km) + 20·log₁₀(f_MHz) + 32.44',color:'5B6876'}]]}];
+    const rangeRows=[['TRX · 配對','頻率','EIRP (dBm)','Sensitivity (dBm)','MAPL (dB)','預估距離（含 margin）','理論上限（0 dB margin）','A · Tx 路徑 → B · Rx 路徑'],...a.ranges.map(r=>[`${r.tx.trx}\nTX${r.tx.channel} → RX${r.rx.channel} · ${r.rule}`,r.frequencyMHz?`${n(r.frequencyMHz)} MHz\n${r.source}`:todo(null),n(r.eirp),n(r.rx.value),n(r.mapl),{text:dist(r.rangeKm),bold:true,color:'1F8A70',size:12},dist(r.rangeNoMarginKm),{text:`A：${r.tx.path}\nB：${r.rx.path}`,size:8.5,color:'5B6876'}])];
+    const rangeCols=[1.75,1.25,.9,1.1,.85,1.35,1.35,3.85];
+    if(a.ranges.length){const pages=paginate(rangeRows,rangeCols,9.5,4.5);pages.forEach((pg,i)=>add(`PRD 分析 · 連線距離預估${pages.length>1?` (${i+1}/${pages.length})`:''}`,assumptions,[...rangeEls,{type:'table',x:.45,y:2.05,cols:rangeCols,size:9.5,band:true,rows:pg.rows,heights:pg.heights,align:[null,null,'r','r','r','r','r',null]},{type:'shape',x:.45,y:6.7,w:12.4,h:.35,text:'自由空間模型為最佳情況（上限），未計入大氣／雨衰、地面反射、Fresnel 區遮蔽、極化不匹配與調變 back-off；天線增益為全域假設值。',size:9,color:'6B7A8C',inset:0}]));}
+    else add('PRD 分析 · 連線距離預估',assumptions,[...rangeEls,{type:'shape',x:.45,y:2.1,w:12.4,h:.8,text:a.rows.length?'需同一顆 TRX 至少各有一條「估算完成」的 Tx 與 Rx 路徑，才能估算對連距離；請補齊 RF 參數（見待補資料）。':'尚無 RF Transceiver（TRX），無法估算對連距離。',size:12,color:'6B7A8C',fill:'FFF7ED',line:'F3D3B0',anchor:'ctr',align:'ctr'}]);
+  }
   function reportSlides(images,now=new Date()){
     const s=P.state,name=s.project?.name||'STRATUM Project',slides=[],date=now.toLocaleString('zh-TW',{hour12:false});
     const add=(title,subtitle,elements)=>slides.push({elements:[...frame(title,subtitle,`${slides.length+1}`,name),...elements]});
@@ -195,17 +248,26 @@
       {type:'shape',x:.8,y:1.6,w:.12,h:2.3,fill:'60D5BF'},
       {type:'shape',x:1.15,y:1.5,w:11,h:.5,text:'▧ STRATUM · SYSTEM PLANNING',size:14,bold:true,color:'60D5BF',inset:0},
       {type:'shape',x:1.15,y:2.05,w:11.4,h:1.1,text:name,size:38,bold:true,color:'FFFFFF',anchor:'ctr',inset:0},
-      {type:'shape',x:1.15,y:3.2,w:11,h:.6,text:'系統架構 · PCB 擺件 · RF Link Budget 報告',size:18,color:'C6D2DE',inset:0},
+      {type:'shape',x:1.15,y:3.2,w:11,h:.6,text:'PRD 分析 · 系統架構 · PCB 擺件 · RF Link Budget 報告',size:18,color:'C6D2DE',inset:0},
       {type:'table',x:1.15,y:4.55,cols:[2.6,2.6,2.6,2.6],size:12,headerFill:'203D55',border:'2A3542',rows:[
         ['方塊','連線','已擺放 IC','RF 路徑'],
         [{text:String(s.components.length),fill:'172331',color:'FFFFFF',size:20,bold:true},{text:String(s.connections.length),fill:'172331',color:'FFFFFF',size:20,bold:true},{text:`${s.placements.length} / ${s.components.length}`,fill:'172331',color:'FFFFFF',size:20,bold:true},{text:String(rows.length),fill:'172331',color:'FFFFFF',size:20,bold:true}]],heights:[.38,.62]},
       {type:'shape',x:1.15,y:6.55,w:11,h:.35,text:`匯出時間 ${date}  ·  PCB ${s.board.width} × ${s.board.height} × ${s.board.thickness} mm`,size:11,color:'8291A3',inset:0}
     ]});
 
+    // Contents placeholder (filled once all section page numbers are known)
+    const sections=[],mark=(title,desc)=>sections.push({title,desc,page:slides.length+1});
+    slides.push(null);
+
+    // PRD analysis
+    if(P.prd){mark('PRD 分析','產品總覽 · CPU／DDR／儲存規格 · 對連距離預估 · 待補資料');prdSlides(add,P.prd.analyze(),s);}
+
     // Architecture
+    mark('方塊架構圖','System Architecture · 由第一頁畫布匯出');
     add('方塊架構圖 · System Architecture',`${s.components.length} 個方塊 · ${s.connections.length} 條連線 · ${s.lines.length} 條直線 · ${s.textBoxes.length} 個文字框`,[fitImage(images.architecture,.45,1.15,12.43,5.9)]);
 
     // Placement Top / Bottom
+    mark('PCB 擺件','Top／Bottom 俯視擺放與 IC 清單');
     for(const face of ['top','bottom']){
       const img=images[face],list=placementRows(face),count=list.length-1,label=face==='top'?'Top 上表面':'Bottom 下表面';
       const subtitle=`PCB ${s.board.width} × ${s.board.height} mm · 板厚 ${s.board.thickness} mm · ${label} ${count} 顆 · Top 最高 ${highest('top')} mm / Bottom 最高 ${highest('bottom')} mm · 整體高度 ${Number((s.board.thickness+highest('top')+highest('bottom')).toFixed(3))} mm`;
@@ -219,8 +281,9 @@
     }
 
     // Link budget summary (Tx then Rx)
+    mark('RF Link Budget','Tx 最大功率 · Rx 靈敏度 · 逐級明細');
     const statusCell=r=>r.valid?(r.warnings.length?{text:'有條件估算',color:'B7791F',bold:true}:{text:'估算完成',color:'1F8A70',bold:true}):{text:'未完成',color:'C2410C',bold:true};
-    const settings=`Rx 雜訊頻寬 ${lb.bandwidthMHz} MHz · 所需 SNR ${lb.snrDb} dB · Sensitivity = −174 + 10log₁₀(BW) + NF + SNR · Tx 受 DA / PA P1dB / 被動元件 Max Input 限制`;
+    const settings=`工作頻率 ${lb.frequencyMHz?lb.frequencyMHz+' MHz':'自動偵測'} · Rx 雜訊頻寬 ${lb.bandwidthMHz} MHz · 所需 SNR ${lb.snrDb} dB · Sensitivity = −174 + 10log₁₀(BW) + NF + SNR · Tx 受 DA / PA P1dB / 被動元件 Max Input 限制`;
     if(!rows.length)add('RF Link Budget',settings,[{type:'shape',x:.45,y:1.3,w:12.4,h:1,text:'尚無 RF Transceiver（TRX），沒有可估算的 RF 路徑。',size:14,color:'6B7A8C',fill:'F3F6F9',anchor:'ctr',align:'ctr'}]);
     for(const kind of ['tx','rx']){
       const subset=rows.filter(r=>r.kind===kind);if(!subset.length)continue;
@@ -247,6 +310,13 @@
       add('RF Link Budget · 逐級明細',settings,els);pending=[];};
     for(const b of blocks){const pages=paginate(b.rows,cols,size,5.2);pages.forEach(page=>{pending.push({r:b.r,page});if(pending.length===2)flush();});}
     flush();
+    slides[1]={elements:[...frame('目錄 · Contents',`${name} · 共 ${slides.length} 頁`,'2',name),...sections.flatMap((sec,i)=>{const y=1.35+i*1.3;return [
+      {type:'shape',x:.9,y,w:1.1,h:1.05,text:String(i+1).padStart(2,'0'),size:34,bold:true,color:'2F9E8A',anchor:'ctr',inset:0},
+      {type:'shape',x:2.1,y:y+.08,w:.04,h:.9,fill:'60D5BF'},
+      {type:'shape',x:2.35,y:y+.05,w:8.6,h:.5,text:sec.title,size:22,bold:true,color:'10161E',anchor:'ctr',inset:0},
+      {type:'shape',x:2.35,y:y+.55,w:8.6,h:.4,text:sec.desc,size:12,color:'5B6876',anchor:'ctr',inset:0},
+      {type:'shape',x:11,y:y+.2,w:1.85,h:.6,text:`p. ${sec.page}`,size:16,bold:true,color:'203D55',align:'r',anchor:'ctr',inset:0},
+      {type:'shape',x:.9,y:y+1.17,w:11.95,h:.015,fill:'D5DCE3'}];})]};
     return slides;
   }
 

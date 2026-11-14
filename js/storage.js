@@ -13,7 +13,12 @@
     const ids=new Set(),claim=item=>{if(!item||typeof item.id!=='string'||!item.id||ids.has(item.id))throw new Error('專案包含遺失或重複的 UUID。');ids.add(item.id);};
     raw.components.forEach(c=>{claim(c);if(typeof c.name!=='string'||!['x','y','width','height','rotation'].every(key=>Number.isFinite(c[key]))||c.width<1||c.height<1)throw new Error('方塊資料無效。');c.shape=c.shape||'rectangle';c.renderColor=c.renderColor||'#1c2938';c.textColor=c.textColor||'#dce5ee';c.fontFamily=c.fontFamily||'Segoe UI';c.fontSize=c.fontSize||15;if(!P.shapes.includes(c.shape)||![c.renderColor,c.textColor].every(color=>/^#[0-9a-f]{6}$/i.test(color))||!P.fonts.includes(c.fontFamily)||!Number.isFinite(c.fontSize)||c.fontSize<8||c.fontSize>48)throw new Error('方塊文字、形狀或顏色格式無效。');});
     raw.linkBudget=raw.linkBudget??{bandwidthMHz:20,snrDb:10};
+    // Working frequency lives with the link budget; older PRD drafts stored it under prd.
+    raw.linkBudget.frequencyMHz=raw.linkBudget.frequencyMHz??raw.prd?.frequencyMHz??null;if(raw.prd&&typeof raw.prd==='object')delete raw.prd.frequencyMHz;
+    if(raw.linkBudget.frequencyMHz!==null&&!(Number.isFinite(raw.linkBudget.frequencyMHz)&&raw.linkBudget.frequencyMHz>=0.001&&raw.linkBudget.frequencyMHz<=1e6))throw new Error('Link Budget 工作頻率須為 0.001–1,000,000 MHz。');
     if(!Number.isFinite(raw.linkBudget.bandwidthMHz)||raw.linkBudget.bandwidthMHz<=0||raw.linkBudget.bandwidthMHz>100000||!Number.isFinite(raw.linkBudget.snrDb)||raw.linkBudget.snrDb< -100||raw.linkBudget.snrDb>100)throw new Error('Link Budget 頻寬或 SNR 無效。');
+    raw.prd={txAntennaGainDbi:0,rxAntennaGainDbi:0,fadeMarginDb:10,...(raw.prd&&typeof raw.prd==='object'?raw.prd:{})};
+    if(P.validPrd&&!P.validPrd(raw.prd))throw new Error('PRD 天線增益或 Fade margin 無效。');
     raw.components.forEach(c=>{for(const [k,v] of Object.entries(P.rfDefaults(c)))if(c[k]===undefined)c[k]=v;if(!P.validRf(c,c))throw new Error('RF 元件參數無效。');});
     raw.components.forEach(c=>{for(const [key,value] of Object.entries(P.componentExtraDefaults))if(c[key]===undefined)c[key]=value;if(!P.validComponentExtras(c))throw new Error('Keep Out、CPU 或記憶體規格無效。');});
     const componentIds=new Set(raw.components.map(c=>c.id));
@@ -36,7 +41,7 @@
   }
   function load(raw){
     const data=validate(clone(raw));P.setMode('select');P.select(null);
-    for(const key of ['project','workspace','appearance','board','linkBudget','components','ports','connections','lines','textBoxes','placements','zones','rules'])P.state[key]=data[key]??P.state[key];
+    for(const key of ['project','workspace','appearance','board','linkBudget','prd','components','ports','connections','lines','textBoxes','placements','zones','rules'])P.state[key]=data[key]??P.state[key];
     P.ui.warning='';P.notify('project-load');return true;
   }
   function filename(extension){const safe=(P.state.project.name||'stratum-project').replace(/[\\/:*?"<>|]+/g,'-').trim()||'stratum-project';return `${safe}.${extension}`;}

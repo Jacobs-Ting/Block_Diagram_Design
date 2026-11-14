@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),zlib=require('node:zlib');
-function setup(){const ctx={window:{},crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);for(const file of ['component-library','rf-model','placement-rules','state','link-budget','pptx-export'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js',file+'.js'),'utf8'),ctx);return ctx.window.Planner;}
+function setup(){const ctx={window:{},crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(ctx);for(const file of ['component-library','rf-model','placement-rules','state','link-budget','prd','pptx-export'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js',file+'.js'),'utf8'),ctx);return ctx.window.Planner;}
 // Minimal reader for the stored (uncompressed) ZIP produced by the exporter.
 function entries(bytes){const b=Buffer.from(bytes),out={};let at=0;while(b.readUInt32LE(at)===0x04034b50){const size=b.readUInt32LE(at+18),n=b.readUInt16LE(at+26),name=b.slice(at+30,at+30+n).toString('utf8'),data=b.slice(at+30+n,at+30+n+size);out[name]=data;at+=30+n+size;}return out;}
 const png=Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==','base64'));
@@ -16,6 +16,9 @@ test('PPTX report contains architecture, placement Top/Bottom and link budget sl
   const slideXml=names.filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a,b)=>parseInt(a.match(/\d+/))-parseInt(b.match(/\d+/))).map(n=>files[n].toString('utf8'));
   assert.equal(slideXml.length,slides.length);
   assert.equal(names.filter(n=>n.startsWith('ppt/media/')).length,3);
+  assert.match(slideXml[1],/目錄 · Contents/);assert.match(slideXml[2],/PRD 分析 · 產品總覽/);
+  assert.ok(slideXml.findIndex(x=>x.includes('PRD 分析'))<slideXml.findIndex(x=>x.includes('方塊架構圖 · System Architecture')));
+  assert.match(slideXml[1],/p\. 3/);
   const all=slideXml.join('');
   for(const text of ['方塊架構圖','Top 上表面','Bottom 下表面','Tx 天線饋入端最大功率','逐級明細','23.00'])assert.ok(all.includes(text),text);
   assert.match(files['ppt/presentation.xml'].toString(),new RegExp(`<p:sldId id="${255+slides.length}"`));

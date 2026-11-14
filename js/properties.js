@@ -107,7 +107,7 @@
       field(panel,'CPU 核心數',c.cpuCores,value=>P.update(c.id,{cpuCores:value}),{name:'cpuCores',number:true,min:1,max:1024,nullable:true,commit:true});
       field(panel,'CPU 時脈 (MHz)',c.cpuClockMHz,value=>P.update(c.id,{cpuClockMHz:value}),{name:'cpuClockMHz',number:true,min:.000001,max:100000,step:.1,nullable:true,commit:true});
     }
-    if(['ddr','emmc'].includes(c.type.toLowerCase())){
+    if(['ddr','emmc','flash','eeprom'].includes(c.type.toLowerCase())){
       panel.append(text('h3','section-title','記憶體 / 儲存容量'));
       field(panel,'容量',c.memoryCapacity,value=>P.update(c.id,{memoryCapacity:value}),{name:'memoryCapacity',number:true,min:.000001,max:1e9,step:.001,nullable:true,commit:true});
       field(panel,'容量單位',c.memoryUnit,value=>P.update(c.id,{memoryUnit:value}),{name:'memoryUnit',choices:['Mb','Gb','MB','GB','TB'],commit:true});

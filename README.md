@@ -39,11 +39,27 @@ Phase 1 Engineering Graph MVP。直接以 Chrome / Edge 開啟 `index.html`，�
 - **PNG**：輸出完整 Architecture 工作區，不受目前 Pan／Zoom 視角影響；選取框、Handle、Port 控制點與預覽線不會出現在圖片中。
 - PNG 以工作區背景色輸出。工作區任一邊超過 8192 時會等比例縮小，以控制記憶體使用量。
 
+## 03 PRD 分析
+
+第三頁（原 Design Check）改為 **PRD 分析**，自動讀取第一頁架構圖並即時更新：
+
+- **系統組成**：依方塊類別彙整。
+- **CPU／處理器規格**：Processor 類別方塊的 Vendor、Part number、CPU 核心數、時脈（CPU 規格欄位）、Voltage、Power 與連接的記憶體。
+- **DDR 規格**與**儲存記憶體（eMMC／Flash／EEPROM）**：容量（記憶體 / 儲存容量欄位，Flash 與 EEPROM 也可填容量）、Frequency 欄位作為速率、連接的處理器；DDR 與儲存總容量自動換算。
+- **RF Link Budget 結果**：引用第四頁 Tx 最大功率與 Rx 靈敏度。
+- **連線距離預估**：假設兩台相同裝置對連，A 的 Tx 路徑 → B 的 Rx 路徑。同一顆 TRX 中優先配對經過同一天線的 Tx／Rx 路徑，其次同通道。MAPL = P_tx + G_tx + G_rx − Sensitivity，扣除 Fade margin 後以自由空間路損 FSPL = 20log₁₀(d_km) + 20log₁₀(f_MHz) + 32.44 反推距離，同時列出 0 dB margin 的理論上限。
+- **工作頻率**設定於第四頁 Link Budget（第三頁也可修改，兩頁共用同一個值，存於 `linkBudget.frequencyMHz`）。留空時自動從天線（其次 TRX）的 Frequency、Part number、Description 欄位辨識，例如「5.8 GHz」；第四頁的「工作頻率」卡片會顯示目前採用的頻率、來源與波長。天線增益、Fade margin 為第三頁全域假設，隨專案存檔與 JSON 匯出。
+- **待補資料**：列出缺少的規格欄位與未完成的 RF 路徑。
+
+自由空間模型為視距最佳情況，不含雨衰、地面反射、Fresnel 遮蔽與極化損失。
+
 ## 匯出 PPT 報告
 
 頂端列右側 **匯出 PPT** 可在任何分頁使用，下載 `<專案名稱>-report.pptx`（16:9，PowerPoint／Keynote／LibreOffice 可開啟），內容：
 
 1. **封面**：專案名稱、方塊／連線／已擺放 IC／RF 路徑數量、PCB 尺寸與匯出時間。
+1. **目錄**：列出各章節與起始頁碼。
+1. **PRD 分析**（緊接目錄）：產品總覽（KPI、系統組成、待補資料）、CPU／DDR／儲存記憶體規格表、裝置對連距離預估（含模型假設與公式）。內容與網頁第三頁相同。
 2. **方塊架構圖**：Architecture 畫布的高解析度圖片，自動裁切到實際物件範圍，不受目前 Pan／Zoom 影響；選取框與控制點不會出現。沿用目前深色／淺色主題。
 3. **PCB 擺件 · Top / Bottom**：兩面各一頁俯視圖（含 Keep Out 與「顯示連線」設定下的虛線），右側列出該面 IC 的封裝、X/Y、尺寸、旋轉與高度；元件多時自動分頁。Bottom 與編輯器相同，使用 Top 視角座標（未鏡像）。
 4. **RF Link Budget**：Tx 最大功率與 Rx 靈敏度彙總表（路徑、結果、Gain、NF／限制來源、狀態、警告），以及每條路徑的逐級明細（每頁兩條）。使用目前專案的頻寬與 SNR 設定。

@@ -6,7 +6,7 @@
   P.fonts = ['Segoe UI','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Courier New','Consolas'];
   P.shapes = ['rectangle','circle','triangle','diamond'];
   P.interfaceColors = {Digital:'#96adca',PCIe:'#83acff',USB:'#af9dfa',SPI:'#78c6dc',I2C:'#78c6dc',UART:'#98b8cc',GPIO:'#98b8cc',MIPI:'#d1a5ef',SerDes:'#83acff',Ethernet:'#79d4ca',RF:'#61d3b3',Clock:'#e6c57d',Power:'#ed9b79',Ground:'#9da8b4',Analog:'#d996bd'};
-  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,thickness:1.6,unit:'mm'},linkBudget:{bandwidthMHz:20,snrDb:10},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
+  P.state = {project:{id:P.uuid(),name:'5G UAV Communication Platform',version:3},appearance:{theme:'dark'},workspace:{width:1400,height:850},board:{width:160,height:100,thickness:1.6,unit:'mm'},linkBudget:{bandwidthMHz:20,snrDb:10,frequencyMHz:null},prd:{txAntennaGainDbi:0,rxAntennaGainDbi:0,fadeMarginDb:10},components:[],ports:[],connections:[],textBoxes:[],placements:[],zones:[],rules:{rfPa:50,paAntenna:50,cpuDdr:40,pcie:100,clock:80,power:60,antennaRadius:30}};
   P.ui = {tab:'architecture',selected:null,selectedKind:null,snap:true,mode:'select'};
   const listeners = new Set();
   P.subscribe = fn => {listeners.add(fn);return()=>listeners.delete(fn);};
