@@ -3,6 +3,7 @@
   // All geometry fits within the configured IC envelope, including SOT leads.
   P.icGeometry=c=>{
     const w=c.icWidth,h=c.icHeight,pads=[];
+    if(c.icPackage==='Hole')return {body:{x:0,y:0,w,h},pads,hole:{cx:w/2,cy:h/2,r:c.holeDiameter/2,pad:c.padDiameter/2}};
     const body=c.icPackage==='SOT'?{x:w*.18,y:0,w:w*.64,h}:c.icPackage==='TQFP'?{x:w*.18,y:h*.18,w:w*.64,h:h*.64}:{x:0,y:0,w,h};
     if(c.icPackage==='SOT')for(let i=0;i<c.icPinCount/2;i++){
       const pitch=h/(c.icPinCount/2+1),height=pitch*.45,y=(i+1)*pitch-height/2;

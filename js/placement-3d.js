@@ -17,8 +17,20 @@
       }
     }
     box(0,0,b.width,b.height,0,b.thickness,'#28775e',null,'PCB');
+    const N=24,ring=(cx,cy,r,z)=>Array.from({length:N},(_,i)=>project(cx+r*Math.cos(2*Math.PI*i/N),cy+r*Math.sin(2*Math.PI*i/N),z));
+    function disc(cx,cy,r,z,color,mount,id,label){const ps=ring(cx,cy,r,z);points.push(...ps);const g=node('g',id?{'data-component':id,class:'pcb-solid'}:{'pointer-events':'none'});g.append(node('polygon',{points:ps.map(p=>`${p.x},${p.y}`).join(' '),fill:color,stroke:id&&id===selected?'#fff':'#102d32','stroke-width':id&&id===selected?.4:.12}));if(id)g.append(node('title',{},label));(mount==='bottom'?bottomFaces:faces).push({depth:ps.reduce((s,p)=>s+p.depth,0)/N,node:g});}
+    // Screw head as a shaded N-gon prism standing on the mounting face.
+    function cylinder(cx,cy,r,z,height,color,id,label,mount){
+      for(let i=0;i<N;i++){const a=2*Math.PI*i/N,a2=2*Math.PI*(i+1)/N,ps=[[a,z],[a2,z],[a2,z+height],[a,z+height]].map(([t,zz])=>project(cx+r*Math.cos(t),cy+r*Math.sin(t),zz));points.push(...ps);
+        const g=node('g',{'data-component':id,class:'pcb-solid'}),pts=ps.map(p=>`${p.x},${p.y}`).join(' ');g.append(node('polygon',{points:pts,fill:color,stroke:color,'stroke-width':.05}),node('polygon',{points:pts,fill:'#000',opacity:.12+.28*(.5+.5*Math.cos((a+a2)/2+yaw)),'pointer-events':'none'}),node('title',{},label));
+        (mount==='bottom'?bottomFaces:faces).push({depth:ps.reduce((s,p)=>s+p.depth,0)/4,node:g});}
+      disc(cx,cy,r,mount==='bottom'?z:z+height,'#c3ccd5',mount,id,label);
+    }
     for(const p of P.state.placements){
       const c=P.component(p.componentId);if(!c)continue;
+      if(P.isScrewHole(c)){const cx=p.x+p.width/2,cy=p.y+p.height/2,mount=p.side||'top',label=`${c.name}\n${P.packageLabel(c)} · 墊 Ø${c.padDiameter} mm\n螺絲頭高 ${c.icThickness} mm`;
+        for(const face of ['top','bottom']){const z=face==='top'?b.thickness+.01:-.01;disc(cx,cy,c.padDiameter/2,z,c.plated?'#c9a64a':'#1d4a3d',face,null);if(face!==mount)disc(cx,cy,c.holeDiameter/2,face==='top'?z+.005:z-.005,'#05100d',face,null);}
+        cylinder(cx,cy,c.padDiameter*.45,mount==='bottom'?-c.icThickness-.01:b.thickness+.01,c.icThickness,'#8f9ba7',c.id,label,mount);continue;}
       const geometry=P.icGeometry(c),body=P.icRect(geometry.body,c,p.rotation),label=`${c.name}\n${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' · '+c.icPinCount+' pins':''}\n${c.icWidth} × ${c.icHeight} × ${c.icThickness} mm`;
       const mount=p.side||'top',z=mount==='bottom'?-c.icThickness:b.thickness;
       box(p.x+body.x,p.y+body.y,body.w,body.h,z,c.icThickness,'#111111',c.id,label,false,mount);

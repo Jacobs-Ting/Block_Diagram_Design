@@ -40,8 +40,13 @@
     const parts=$('pcb-parts'),nets=$('pcb-nets');parts.replaceChildren();nets.replaceChildren();
     const collisions=new Set();for(const a of P.state.placements)for(const b of P.state.placements)if(a!==b&&side(a)===side(b)&&overlaps(a,b))collisions.add(a.componentId);
     if($('show-ratsnest').checked)for(const e of P.state.connections){const a=find(e.source.componentId),b=find(e.target.componentId);if(!a||!b||side(a)!==activeSide()||side(b)!==activeSide())continue;const x=size(a),y=size(b);const l=node('line',{x1:a.x+x.w/2,y1:a.y+x.h/2,x2:b.x+y.w/2,y2:b.y+y.h/2,stroke:P.interfaceColors[e.interfaceType]||'#aaa','stroke-width':.25,'stroke-dasharray':'1 1'});l.append(node('title',{},e.label||e.interfaceType));nets.append(l);}
-    for(const p of P.state.placements){const c=P.component(p.componentId);if(!c||side(p)!==activeSide())continue;const {w,h}=size(p),g=node('g',{'data-component':c.id,transform:`translate(${p.x} ${p.y})`,tabindex:0,role:'button','aria-label':`${c.name} · ${p.x}, ${p.y} mm`,class:'pcb-chip'+(selected===c.id?' selected':'')+(collisions.has(c.id)?' collision':'')});
+    const holeMarks=(c,cx,cy)=>[node('circle',{cx,cy,r:c.padDiameter/2,fill:c.plated?'#c9a64a':'#1d4a3d',stroke:'#e4e9ee','stroke-width':.25,class:'pcb-hole-pad'}),node('circle',{cx,cy,r:c.holeDiameter/2,fill:'#05100d',stroke:'#7f9a90','stroke-width':.15,class:'pcb-hole-drill'})];
+    for(const p of P.state.placements){const c=P.component(p.componentId);
+      // Screw holes go through the board: show them (not draggable) on the opposite face too.
+      if(c&&P.isScrewHole(c)&&side(p)!==activeSide()){const through=node('g',{class:'pcb-hole-through',opacity:.75,'pointer-events':'none'});through.append(...holeMarks(c,p.x+p.width/2,p.y+p.height/2),node('title',{},`${c.name}（貫穿孔，螺絲頭在 ${side(p).toUpperCase()} 面）`));parts.append(through);continue;}
+      if(!c||side(p)!==activeSide())continue;const {w,h}=size(p),g=node('g',{'data-component':c.id,transform:`translate(${p.x} ${p.y})`,tabindex:0,role:'button','aria-label':`${c.name} · ${p.x}, ${p.y} mm`,class:'pcb-chip'+(selected===c.id?' selected':'')+(collisions.has(c.id)?' collision':'')});
       const geometry=P.icGeometry(c),body=P.icRect(geometry.body,c,p.rotation);
+      if(geometry.hole){g.append(...holeMarks(c,w/2,h/2),node('text',{x:w/2,y:h+1.6,'text-anchor':'middle','font-size':1.2,fill:'#dfe8ef'},`${c.name} · ${P.packageLabel(c)}`),node('title',{},`${c.name}\n${P.packageLabel(c)} · 墊 Ø${c.padDiameter} mm · 螺絲頭高 ${c.icThickness} mm\n貫穿孔：背面相同位置禁佈`));parts.append(g);continue;}
       for(const pad of geometry.pads){const r=P.icRect(pad,c,p.rotation);g.append(node('rect',{x:r.x,y:r.y,width:r.w,height:r.h,fill:'#c1cbd1',class:'pcb-lead'}));}
       g.append(node('rect',{x:body.x,y:body.y,width:body.w,height:body.h,rx:.6,fill:'#202b38',stroke:P.colors[c.category]||'#99aabb','stroke-width':.4}));
       // A pin marker and edge pads make the planning footprint distinct from a logical block.
@@ -56,7 +61,7 @@
     for(const c of P.state.components){
       const p=find(c.id),row=document.createElement('tr');row.dataset.componentId=c.id;row.classList.toggle('selected',selected===c.id);
       const title=document.createElement('td'),name=document.createElement('button');name.className='inventory-select';name.textContent=c.name;name.disabled=!p;name.title=p?'選取並顯示此 IC':'請先選擇 TOP 或 Bottom';name.onclick=()=>showPlacement(c.id);title.append(name);row.append(title);
-      const detail=document.createElement('td');detail.textContent=`${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+' PIN':''} · ${c.icWidth} × ${c.icHeight} × ${c.icThickness}`;row.append(detail);
+      const detail=document.createElement('td');detail.textContent=P.isScrewHole(c)?`${P.packageLabel(c)} · 墊 Ø${c.padDiameter} · 頭高 ${c.icThickness}`:`${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+' PIN':''} · ${c.icWidth} × ${c.icHeight} × ${c.icThickness}`;row.append(detail);
       const status=document.createElement('td');status.className='placement-side-status';status.textContent=p?side(p).toUpperCase():'未擺放';row.append(status);
       const actions=document.createElement('td');
       for(const face of ['top','bottom']){

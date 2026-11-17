@@ -181,7 +181,7 @@
   function placementRows(face){
     const rows=[['元件','封裝','X, Y (mm)','尺寸 (mm)','旋轉','高 (mm)']];
     for(const p of P.state.placements.filter(p=>(p.side||'top')===face)){const c=P.component(p.componentId);if(!c)continue;
-      rows.push([c.name,c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage+(['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+'P':''),`${p.x}, ${p.y}`,`${p.width} × ${p.height}`,p.rotation+'°',c.icThickness]);}
+      rows.push([c.name,P.isScrewHole(c)?P.packageLabel(c):c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage+(['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+'P':''),`${p.x}, ${p.y}`,`${p.width} × ${p.height}`,p.rotation+'°',c.icThickness]);}
     return rows;
   }
   // Flow several titled tables down slides, splitting long tables across pages.

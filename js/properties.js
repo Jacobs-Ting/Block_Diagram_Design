@@ -114,7 +114,7 @@
     }
     panel.append(text('h3','section-title','IC KEEP OUT'));
     for(const [key,label] of [['keepOutSame','啟用同面 Keep Out'],['keepOutOpposite','啟用背面 Keep Out']]){
-      const wrapper=text('label','field',label),input=document.createElement('input');input.type='checkbox';input.name=key;input.checked=c[key];input.style.width='auto';
+      const wrapper=text('label','field',label),input=document.createElement('input');input.type='checkbox';input.name=key;input.checked=c[key];input.style.width='auto';if(key==='keepOutOpposite'&&P.isScrewHole(c)){input.disabled=true;input.title='螺絲鎖孔為貫穿孔，背面固定禁佈';}
       input.onchange=()=>{if(!P.update(c.id,{[key]:input.checked},'keepout-update')){input.checked=c[key];input.setCustomValidity('目前擺件會違反 Keep Out，請先移動附近元件。');input.reportValidity();}else input.setCustomValidity('');};wrapper.append(input);panel.append(wrapper);
     }
     field(panel,'同面額外邊距 (mm／每側)',c.keepOutMargin,(value,input)=>{if(!P.update(c.id,{keepOutMargin:value},'keepout-update')){input.value=c.keepOutMargin;input.setCustomValidity('邊距會涵蓋其他 IC，請先調整擺件。');input.reportValidity();}else input.setCustomValidity('');},{name:'keepOutMargin',number:true,min:0,max:1000,step:.1,commit:true});
@@ -128,45 +128,59 @@
       const input=field(panel,label,c[key],value=>{P.update(c.id,{[key]:value});if(key==='name')header.querySelector('h2').textContent=value;if(key==='category')header.querySelector('.chip-icon').textContent=P.icons[value];},{name:key,required:key==='name',choices:key==='category'?Object.keys(P.groups):null});
       input.addEventListener('blur',()=>{if(key==='name'&&!input.value.trim()){input.value=c.name;input.setCustomValidity('');}});
     }
-    panel.append(text('h3','section-title','元件封裝'));
-    if(P.isPassive(c))field(panel,'元件值 / 規格',c.componentValue,value=>P.update(c.id,{componentValue:value}),{name:'componentValue',placeholder:c.type==='R'?'例如 10 kΩ ±1%':c.type==='L'?'例如 10 µH':'例如 100 nF / 50 V'});
-    field(panel,P.isPassive(c)?'英制封裝':'IC 封裝',c.icPackage,value=>{P.update(c.id,{icPackage:value},'ic-package');render();},{name:'icPackage',commit:true,choices:P.packageChoices(c).map(v=>v==='Custom'?[v,'自訂規格']:v)});
-    if(P.isPassive(c))panel.append(text('p','inspector-note','英制代碼以 0.01 inch 換算標稱長寬；實際尺寸請依料件規格調整，修改長寬會切換為自訂。'));
-    if(c.icPackage==='Custom')field(panel,'自訂封裝規格',c.packageSpec,value=>P.update(c.id,{packageSpec:value}),{name:'packageSpec',placeholder:'輸入封裝名稱或規格，並於下方設定實體尺寸'});
-    if(c.icPackage==='TQFP'){
-      const pinInput=field(panel,'TQFP 總 PIN 腳數',c.icPinCount,(value,input)=>{
-        const ok=P.update(c.id,{icPinCount:value},'ic-package');
-        input.setCustomValidity(ok?'':'請輸入 4–256 的四倍數。');
-        if(!ok){input.reportValidity();return;}
-        summary.textContent=`每側 ${value/4} 腳（總計 ${value} 腳）`;
-      },{name:'icPinCount',number:true,min:4,max:256,step:4,commit:true});
-      pinInput.addEventListener('blur',()=>{pinInput.value=c.icPinCount;pinInput.setCustomValidity('');});
-      const summary=text('p','inspector-note',`每側 ${c.icPinCount/4} 腳（總計 ${c.icPinCount} 腳）；外形與腳位為規劃示意。`);panel.append(summary);
+    if(P.isScrewHole(c)){
+      panel.append(text('h3','section-title','螺絲鎖孔規格 / 機構件'));
+      const apply=(changes,input)=>{const ok=P.update(c.id,changes,'ic-size');if(!ok&&input){input.setCustomValidity('數值無效或孔位超出電路板／違反 Keep Out：焊墊直徑須大於鑽孔直徑。');input.reportValidity();}else input?.setCustomValidity('');return ok;};
+      field(panel,'螺絲規格',c.screwSize,value=>{if(value!=='Custom'){const d=P.screwSizes[value];apply({screwSize:value,holeDiameter:d.holeDiameter,padDiameter:d.padDiameter,icWidth:d.padDiameter,icHeight:d.padDiameter,icThickness:d.icThickness});}else apply({screwSize:'Custom'});render();},{name:'screwSize',commit:true,choices:[...Object.keys(P.screwSizes).map(v=>[v,`${v}（孔 Ø${P.screwSizes[v].holeDiameter} · 墊 Ø${P.screwSizes[v].padDiameter} mm）`]),['Custom','自訂']]});
+      field(panel,'孔型',c.plated?'PTH':'NPTH',value=>apply({plated:value==='PTH'}),{name:'plated',commit:true,choices:[['PTH','PTH 電鍍孔（可接地）'],['NPTH','NPTH 非電鍍孔']]});
+      const dims=text('div','field-row','');
+      const hole=field(dims,'鑽孔直徑 (mm)',c.holeDiameter,(value,input)=>{if(apply({holeDiameter:value,screwSize:'Custom'},input))render();},{name:'holeDiameter',number:true,min:.05,max:100,step:.01,commit:true});
+      const pad=field(dims,'焊墊／禁佈直徑 (mm)',c.padDiameter,(value,input)=>{if(apply({padDiameter:value,icWidth:value,icHeight:value,screwSize:'Custom'},input))render();},{name:'padDiameter',number:true,min:.1,max:200,step:.01,commit:true});
+      panel.append(dims);
+      const head=field(panel,'螺絲頭高度 (mm)',c.icThickness,(value,input)=>apply({icThickness:value},input),{name:'icThickness',number:true,min:.1,max:1000,step:.1,commit:true});
+      for(const input of [hole,pad,head])input.addEventListener('blur',()=>{input.value=c[input.name];input.setCustomValidity('');});
+      panel.append(text('p','inspector-note','鑽孔直徑依 ISO 273 精密級間隙孔預設；焊墊／禁佈直徑即 Placement 的圓形佔位（同時用於螺絲頭座面）。鎖孔為貫穿孔，固定佔用背面相同位置；擺放面代表螺絲頭所在面，螺絲頭高度計入該面最高元件。'));
+    }else{
+      panel.append(text('h3','section-title','元件封裝'));
+      if(P.isPassive(c))field(panel,'元件值 / 規格',c.componentValue,value=>P.update(c.id,{componentValue:value}),{name:'componentValue',placeholder:c.type==='R'?'例如 10 kΩ ±1%':c.type==='L'?'例如 10 µH':'例如 100 nF / 50 V'});
+      field(panel,P.isPassive(c)?'英制封裝':'IC 封裝',c.icPackage,value=>{P.update(c.id,{icPackage:value},'ic-package');render();},{name:'icPackage',commit:true,choices:P.packageChoices(c).map(v=>v==='Custom'?[v,'自訂規格']:v)});
+      if(P.isPassive(c))panel.append(text('p','inspector-note','英制代碼以 0.01 inch 換算標稱長寬；實際尺寸請依料件規格調整，修改長寬會切換為自訂。'));
+      if(c.icPackage==='Custom')field(panel,'自訂封裝規格',c.packageSpec,value=>P.update(c.id,{packageSpec:value}),{name:'packageSpec',placeholder:'輸入封裝名稱或規格，並於下方設定實體尺寸'});
+      if(c.icPackage==='TQFP'){
+        const pinInput=field(panel,'TQFP 總 PIN 腳數',c.icPinCount,(value,input)=>{
+          const ok=P.update(c.id,{icPinCount:value},'ic-package');
+          input.setCustomValidity(ok?'':'請輸入 4–256 的四倍數。');
+          if(!ok){input.reportValidity();return;}
+          summary.textContent=`每側 ${value/4} 腳（總計 ${value} 腳）`;
+        },{name:'icPinCount',number:true,min:4,max:256,step:4,commit:true});
+        pinInput.addEventListener('blur',()=>{pinInput.value=c.icPinCount;pinInput.setCustomValidity('');});
+        const summary=text('p','inspector-note',`每側 ${c.icPinCount/4} 腳（總計 ${c.icPinCount} 腳）；外形與腳位為規劃示意。`);panel.append(summary);
+      }
+      if(c.icPackage==='SOT'){
+        const pinInput=field(panel,'SOT 總 PIN 腳數',c.icPinCount,(value,input)=>{
+          const ok=P.update(c.id,{icPinCount:value},'ic-package');
+          input.setCustomValidity(ok?'':'請輸入 2–64 的偶數，左右各分配一半腳位。');
+          if(!ok){input.reportValidity();return;}
+          summary.textContent=`左側 ${value/2} 腳 · 右側 ${value/2} 腳（總計 ${value} 腳）`;
+        },{name:'icPinCount',number:true,min:2,max:64,step:2,commit:true});
+        pinInput.addEventListener('blur',()=>{pinInput.value=c.icPinCount;pinInput.setCustomValidity('');});
+        const summary=text('p','inspector-note',`左側 ${c.icPinCount/2} 腳 · 右側 ${c.icPinCount/2} 腳（總計 ${c.icPinCount} 腳）`);panel.append(summary);
+      }
+      panel.append(text('h3','section-title','IC 實體尺寸 / PLACEMENT'));
+      const icSizes=text('div','field-row','');
+      const area=field(document.createElement('div'),'IC 面積 (mm²)',Number((c.icWidth*c.icHeight).toFixed(4)),null,{name:'icArea',readonly:true});
+      for(const [key,label] of [['icWidth','IC 長 (mm)'],['icHeight','IC 寬 (mm)'],['icThickness','IC 高 (mm)']]){
+        const input=field(icSizes,label,c[key],(value,input)=>{
+          const ok=P.update(c.id,{[key]:value},'ic-size');
+          input.setCustomValidity(ok?'':'IC 尺寸超出目前電路板，請先增加板尺寸。');
+          if(!ok){input.reportValidity();return;}
+          area.value=Number((c.icWidth*c.icHeight).toFixed(4));
+          if(P.isPassive(c))render();
+        },{name:key,number:true,min:key==='icThickness'?0.1:0.01,max:1000,step:0.001,commit:true});
+        input.addEventListener('blur',()=>{input.value=c[key];input.setCustomValidity('');});
+      }
+      panel.append(icSizes,area.parentElement,text('p','inspector-note','面積 = 長 × 寬；Placement 的 3D IC 使用相同長、寬、高（mm）。下方 Width / Height 僅控制架構圖方塊大小。'));
     }
-    if(c.icPackage==='SOT'){
-      const pinInput=field(panel,'SOT 總 PIN 腳數',c.icPinCount,(value,input)=>{
-        const ok=P.update(c.id,{icPinCount:value},'ic-package');
-        input.setCustomValidity(ok?'':'請輸入 2–64 的偶數，左右各分配一半腳位。');
-        if(!ok){input.reportValidity();return;}
-        summary.textContent=`左側 ${value/2} 腳 · 右側 ${value/2} 腳（總計 ${value} 腳）`;
-      },{name:'icPinCount',number:true,min:2,max:64,step:2,commit:true});
-      pinInput.addEventListener('blur',()=>{pinInput.value=c.icPinCount;pinInput.setCustomValidity('');});
-      const summary=text('p','inspector-note',`左側 ${c.icPinCount/2} 腳 · 右側 ${c.icPinCount/2} 腳（總計 ${c.icPinCount} 腳）`);panel.append(summary);
-    }
-    panel.append(text('h3','section-title','IC 實體尺寸 / PLACEMENT'));
-    const icSizes=text('div','field-row','');
-    const area=field(document.createElement('div'),'IC 面積 (mm²)',Number((c.icWidth*c.icHeight).toFixed(4)),null,{name:'icArea',readonly:true});
-    for(const [key,label] of [['icWidth','IC 長 (mm)'],['icHeight','IC 寬 (mm)'],['icThickness','IC 高 (mm)']]){
-      const input=field(icSizes,label,c[key],(value,input)=>{
-        const ok=P.update(c.id,{[key]:value},'ic-size');
-        input.setCustomValidity(ok?'':'IC 尺寸超出目前電路板，請先增加板尺寸。');
-        if(!ok){input.reportValidity();return;}
-        area.value=Number((c.icWidth*c.icHeight).toFixed(4));
-        if(P.isPassive(c))render();
-      },{name:key,number:true,min:key==='icThickness'?0.1:0.01,max:1000,step:0.001,commit:true});
-      input.addEventListener('blur',()=>{input.value=c[key];input.setCustomValidity('');});
-    }
-    panel.append(icSizes,area.parentElement,text('p','inspector-note','面積 = 長 × 寬；Placement 的 3D IC 使用相同長、寬、高（mm）。下方 Width / Height 僅控制架構圖方塊大小。'));
     field(panel,'形狀',c.shape||'rectangle',value=>P.update(c.id,{shape:value}),{choices:[['rectangle','方形'],['circle','圓形'],['triangle','三角形'],['diamond','菱形']]});
     const min=P.minimumSize(c.id),sizes=text('div','field-row','');
     for(const key of ['width','height']){

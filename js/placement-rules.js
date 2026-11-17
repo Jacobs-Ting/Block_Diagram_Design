@@ -25,5 +25,5 @@
   }
   P.boardRules={size,rect,zones,conflict,valid,all,findSpace};
   P.componentExtraDefaults={keepOutSame:false,keepOutOpposite:false,keepOutMargin:1,cpuCores:null,cpuClockMHz:null,memoryCapacity:null,memoryUnit:'GB'};
-  P.validComponentExtras=c=>typeof c.keepOutSame==='boolean'&&typeof c.keepOutOpposite==='boolean'&&Number.isFinite(c.keepOutMargin)&&c.keepOutMargin>=0&&c.keepOutMargin<=1000&&(c.cpuCores===null||Number.isInteger(c.cpuCores)&&c.cpuCores>=1&&c.cpuCores<=1024)&&(c.cpuClockMHz===null||Number.isFinite(c.cpuClockMHz)&&c.cpuClockMHz>0&&c.cpuClockMHz<=100000)&&(c.memoryCapacity===null||Number.isFinite(c.memoryCapacity)&&c.memoryCapacity>0&&c.memoryCapacity<=1e9)&&['Mb','Gb','MB','GB','TB'].includes(c.memoryUnit);
+  P.validComponentExtras=c=>typeof c.keepOutSame==='boolean'&&typeof c.keepOutOpposite==='boolean'&&Number.isFinite(c.keepOutMargin)&&c.keepOutMargin>=0&&c.keepOutMargin<=1000&&(c.cpuCores===null||Number.isInteger(c.cpuCores)&&c.cpuCores>=1&&c.cpuCores<=1024)&&(c.cpuClockMHz===null||Number.isFinite(c.cpuClockMHz)&&c.cpuClockMHz>0&&c.cpuClockMHz<=100000)&&(c.memoryCapacity===null||Number.isFinite(c.memoryCapacity)&&c.memoryCapacity>0&&c.memoryCapacity<=1e9)&&['Mb','Gb','MB','GB','TB'].includes(c.memoryUnit)&&(!P.isScrewHole?.(c)||P.validScrewHole(c));
 })(window.Planner);
