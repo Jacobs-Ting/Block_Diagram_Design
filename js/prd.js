@@ -61,6 +61,7 @@
       return {...p,frequencyMHz,source,...linkRange({...settings,txPowerDbm:p.tx.value,rxSensitivityDbm:p.rx.value,frequencyMHz})};
     });
     if(rows.some(r=>r.valid)&&ranges.some(r=>!r.frequencyMHz))missing.push('無法從天線／TRX 的 Frequency 欄位辨識工作頻率，請在第四頁 Link Budget（或本頁）填入工作頻率 (MHz)。');
+    for(const name of P.edgeMountIssues?.(state)||[])missing.push(`${name}：側插接頭未貼齊板邊（Placement）`);
     const byCategory={};for(const c of comps)(byCategory[c.category]??=[]).push(c.name);
     return {processors,ddr,storage,rows,ranges,byCategory,missing:[...new Set(missing)],settings,
       totals:{ddrGB:ddr.reduce((s,m)=>s+(m.gb??0),0),storageGB:storage.reduce((s,m)=>s+(m.gb??0),0),bestKm:Math.max(0,...ranges.filter(r=>Number.isFinite(r.rangeKm)).map(r=>r.rangeKm))}};

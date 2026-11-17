@@ -99,6 +99,7 @@
       for(const [key,label,min,max,step] of rfFields){
         field(panel,label,c[key],(value,input)=>{const ok=P.update(c.id,{[key]:value},'rf-update');if(!ok){input.value=c[key]??'';input.setCustomValidity('此數量或參數無效；減少 port 前請先移除相關連線。');input.reportValidity();}else if(step===1)render();},{name:key,number:true,min,max,step:step===1?undefined:step,nullable:step!==1,commit:true,placeholder:step===1?'':'尚未設定'});
       }
+      if(['SMA Edge Mount','IPEX'].includes(c.type))panel.append(text('p','inspector-note','RF 接頭以被動元件模型計入 Link Budget：Loss 為接頭在工作頻率的插入損耗（請依料號 datasheet；配接線材損耗請填在連線 Loss），Max Input Level 為功率耐受上限。未填值時路徑會標示「未完成」，不會以假定值代入。'+(c.type==='SMA Edge Mount'?' 側插 SMA 須貼齊板邊，Placement 中可使用「貼齊最近板邊」。':'')));
       if(P.isTrx(c))panel.append(text('p','inspector-note','Tx／Rx 各最多 4 路，共用本元件 RF 參數；路數會自動更新 TXn／RXn RF ports。請從具名 RF port 接線。'));
     }
     if(P.isTrx(c)||c.type==='RF Switch'||c.type==='Balun'){panel.append(text('p','inspector-note',c.type==='Balun'?'左側 BAL 為差分平衡端，右側 UNBAL 為單端；請填入 Balun 的 Loss／Max Input Level。':c.type==='RF Switch'?'左側 RF1～RFN 為分支，右側固定一個 RFC 共用端。每條切換路徑為 RFN ↔ RFC；兩端分別填入 Loss／Max Level，損耗相加。':'RF port 由 Tx／Rx 路數管理；請從對應 TXn／RXn 接線，通道會自動辨識。'));ports(c);}

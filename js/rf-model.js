@@ -1,7 +1,7 @@
 (function(P){
   'use strict';
   P.isTrx=c=>!!c&&['RF Transceiver','TRX','Trx'].includes(c.type);
-  P.isRfSignal=c=>!!c&&(P.isTrx(c)||['PA','LNA','RF Switch','Balun','Filter','Duplexer','Antenna','GNSS Antenna'].includes(c.type));
+  P.isRfSignal=c=>!!c&&(P.isTrx(c)||['PA','LNA','RF Switch','Balun','Filter','Duplexer','Antenna','GNSS Antenna','SMA Edge Mount','IPEX'].includes(c.type));
   P.isRfPair=(source,target)=>P.isRfSignal(P.component(source.componentId))&&P.isRfSignal(P.component(target.componentId));
   P.rfConnectionCandidates=()=>P.state.connections.filter(e=>e.interfaceType==='Digital'&&!e.source.portId&&!e.target.portId&&P.isRfPair(e.source,e.target));
   P.rfFields=c=>P.isTrx(c)?[
@@ -9,7 +9,7 @@
     ['txPower','Tx DA Power (dBm)',-100,100,.1],['rxGain','Rx LNA Gain (dB)',-100,100,.1],['rxNf','Rx LNA NF (dB)',0,100,.1]
   ]:c.type==='PA'?[['rfGain','Gain (dB)',-100,100,.1],['p1db','Output P1dB (dBm)',-100,100,.1]]:
     c.type==='LNA'?[['rfGain','Gain (dB)',-100,100,.1],['rfNf','NF (dB)',0,100,.1]]:
-    c.type==='RF Switch'?[['rfPortCount','RF 分支 Port 數量',1,32,1]]:['Filter','Duplexer','Balun'].includes(c.type)?[['rfLoss','Loss (dB)',0,100,.1],['maxInput','Max Input Level (dBm)',-100,100,.1]]:[];
+    c.type==='RF Switch'?[['rfPortCount','RF 分支 Port 數量',1,32,1]]:['Filter','Duplexer','Balun','SMA Edge Mount','IPEX'].includes(c.type)?[['rfLoss','Loss (dB)',0,100,.1],['maxInput','Max Input Level (dBm)',-100,100,.1]]:[];
   P.rfDefaults=c=>Object.fromEntries(P.rfFields(c).map(([k])=>[k,k==='rfPortCount'?2:['txChannels','rxChannels'].includes(k)?1:null]));
   P.validRf=(c,changes)=>P.rfFields(c).every(([k,,min,max,step])=>!(k in changes)||(changes[k]===null&&step!==1)||(Number.isFinite(changes[k])&&changes[k]>=min&&changes[k]<=max&&(step!==1||Number.isInteger(changes[k]))));
   P.validRfPort=p=>(p.signalMode===undefined||['single','differential'].includes(p.signalMode))&&['loss','maxLevel'].every(k=>p[k]===undefined||p[k]===null||Number.isFinite(p[k])&&p[k]>=(k==='loss'?0:-100)&&p[k]<=100);

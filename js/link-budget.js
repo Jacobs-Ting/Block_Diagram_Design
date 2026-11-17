@@ -1,6 +1,6 @@
 (function(P){
   'use strict';
-  const passive=['Filter','RF Switch','Duplexer','Balun'],antenna=c=>c?.type==='Antenna'||c?.type==='GNSS Antenna';
+  const passive=['Filter','RF Switch','Duplexer','Balun','SMA Edge Mount','IPEX'],antenna=c=>c?.type==='Antenna'||c?.type==='GNSS Antenna';
   const db=x=>10*Math.log10(x),lin=x=>10**(x/10);
   function routes(trx,kind,channel){
     const results=[],rf=P.state.connections.filter(e=>e.interfaceType==='RF'&&P.rfPairRepresentative(e)&&(e.rfMode==='auto'||e.rfMode==='both'||e.rfMode===kind));

@@ -170,8 +170,8 @@
     select.value=face;P.placement.render();
     const copy=P.inlineSvgStyles(source,source.cloneNode(true));copy.removeAttribute('hidden');copy.style.display='inline';copy.removeAttribute('id');copy.setAttribute('xmlns','http://www.w3.org/2000/svg');
     copy.querySelectorAll('.selected').forEach(n=>n.classList.remove('selected'));
-    const vw=b.width+10,vh=b.height+10,scale=Math.min(14,3600/Math.max(vw,vh)),W=Math.round(vw*scale),H=Math.round(vh*scale);
-    copy.setAttribute('width',W);copy.setAttribute('height',H);copy.setAttribute('viewBox',`-5 -5 ${vw} ${vh}`);
+    const [vx,vy,vw,vh]=(source.getAttribute('viewBox')||`-5 -5 ${b.width+10} ${b.height+10}`).split(/\s+/).map(Number),scale=Math.min(14,3600/Math.max(vw,vh)),W=Math.round(vw*scale),H=Math.round(vh*scale);
+    copy.setAttribute('width',W);copy.setAttribute('height',H);copy.setAttribute('viewBox',`${vx} ${vy} ${vw} ${vh}`);
     const style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent=stylesheetText()+'#pcb-canvas,svg{width:auto;height:auto}';copy.querySelector('defs').append(style);
     const svg=new XMLSerializer().serializeToString(copy);
     return {...await svgToPng(svg,W,H,'#101e22'),alt:`PCB placement ${face}`};

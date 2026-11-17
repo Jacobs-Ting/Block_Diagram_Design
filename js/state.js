@@ -23,7 +23,7 @@
   };
   P.addComponent = (name,x=70,y=100,extra={},createPorts=true) => {
     const template=P.library.find(c=>c.name===name)||{name,category:'Other'};
-    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,packageSpec:'',componentValue:'',...(P.isPassive({type:name})?{icPackage:'0402',...P.imperialPackages['0402'],icThickness:0.5}:template.category==='Connector'?{icPackage:'Custom'}:{}),...P.componentExtraDefaults,...P.rfDefaults({type:template.name}),...(template.name==='Screw Hole'?P.screwHoleDefaults():{}),...extra,id:P.uuid()};
+    const c={name:template.name,type:template.name,category:template.category,shape:'rectangle',vendor:'',partNumber:'',description:'',voltage:'',frequency:'',power:'',notes:'',renderColor:'#1c2938',textColor:'#dce5ee',fontFamily:'Segoe UI',fontSize:15,x,y,width:200,height:112,rotation:0,icWidth:12,icHeight:12,icThickness:1.5,icPackage:'QFN',icPinCount:6,minWidth:180,minHeight:112,packageSpec:'',componentValue:'',...(P.isPassive({type:name})?{icPackage:'0402',...P.imperialPackages['0402'],icThickness:0.5}:template.category==='Connector'?{icPackage:'Custom'}:{}),...P.componentExtraDefaults,...P.rfDefaults({type:template.name}),...(template.name==='Screw Hole'?P.screwHoleDefaults():{}),...(P.typeDefaults[template.name]||{}),...extra,id:P.uuid()};
     P.state.components.push(c);if(createPorts)P.syncRfPorts(c);P.notify('add',c.id);return c;
   };
   P.ui.selection=[];

@@ -39,6 +39,23 @@ Phase 1 Engineering Graph MVP。直接以 Chrome / Edge 開啟 `index.html`，�
 - **PNG**：輸出完整 Architecture 工作區，不受目前 Pan／Zoom 視角影響；選取框、Handle、Port 控制點與預覽線不會出現在圖片中。
 - PNG 以工作區背景色輸出。工作區任一邊超過 8192 時會等比例縮小，以控制記憶體使用量。
 
+## RF 接頭：側插 SMA、IPEX
+
+Connector 類別新增兩種 RF 接頭（搜尋「接頭」「SMA」「側插」「IPEX」「U.FL」「MHF」皆可）：
+
+| 元件 | 預設名稱 | 規劃封裝（自訂，可修改） |
+|---|---|---|
+| 側插 SMA 接頭 (Edge-mount) | SMA 側插接頭 | 側插 SMA（End-launch）板上佔位 6.35 × 4.5 mm，板面以上 2.4 mm；筒身伸出板邊 |
+| IPEX 接頭 (MHF / U.FL) | IPEX 接頭 | IPEX MHF I（U.FL 相容）3.0 × 2.6 × 1.25 mm |
+
+- 兩者屬於 RF 元件，可直接串在 RF 路徑中（例如 PA → IPEX → 線材 → SMA → Antenna）。在 Properties 的 RF / LINK BUDGET 填入 **Loss (dB)**（接頭插入損耗）與 **Max Input Level (dBm)**，Link Budget 以被動元件模型計算：Tx 扣除損耗並受 Max Input 限制，Rx 以 NF = Loss 串入 Friis。未填值時路徑標示未完成，不以假定值代入；配接線材損耗請填在連線 Loss。
+- **側插 SMA 必須貼齊板邊**：未貼齊時 Placement 狀態列與 PRD 待補資料會提示；選取後按「貼齊最近板邊」即可移到最近且不違反 Keep Out 的板邊。
+- 尺寸為規劃值，請依實際料號 datasheet 修改 IC 長／寬／高。
+- **擬真外型**（Placement 2D／3D 共用同一份幾何）：
+  - 側插 SMA：鍍金法蘭貼在板邊、1/4"-36 螺紋筒身伸出板外（端面有 PTFE 介質與中心針）、中心針平貼上表面、兩側接地腳夾住上下兩面。**旋轉決定筒身朝向**：0° 上、90° 右、180° 下、270° 左；「貼齊最近板邊」會同時設定方向與位置，新擺放時也會自動貼齊。上下兩面都有接地腳，因此預設啟用背面 Keep Out；另一面俯視會以半透明顯示接地腳與筒身。
+  - IPEX（MHF I／U.FL 相容）：米色 LCP 底座、兩側接地片、訊號腳、銀色插座外殼與中心針；旋轉會轉動訊號腳方向。
+  - 外型隨 IC 長／寬等比縮放；俯視畫布會自動加大邊界以顯示伸出板外的筒身。
+
 ## 機構件：螺絲鎖孔
 
 元件庫新增 **Mechanical** 類別的 **螺絲鎖孔 (Screw Hole)**（搜尋「螺絲」「鎖孔」「screw」「mounting」皆可）。加入後為圓形方塊，可在 Properties 設定：

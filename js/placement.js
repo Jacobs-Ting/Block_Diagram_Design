@@ -1,7 +1,7 @@
 (function(P){
   'use strict';
   const $=id=>document.getElementById(id),svg=$('pcb-canvas'),NS='http://www.w3.org/2000/svg';
-  let selected=null,drag=null;const boardDraft=new Set();
+  let selected=null,drag=null,margin=5;const boardDraft=new Set();
   for(const key of ['width','height','thickness'])$('board-'+key).addEventListener('input',()=>boardDraft.add(key));
   const side=p=>p.side||'top';
   const activeSide=()=>$('placement-side').value;
@@ -20,7 +20,7 @@
     $('placement-rule-warning').textContent='';
     changed();
   }
-  function place(id){if(find(id)||!P.component(id))return;const c=P.component(id);if(c.icWidth>P.state.board.width||c.icHeight>P.state.board.height){$('placement-message').textContent=`${c.name} 的 IC 尺寸超出電路板，請增加板尺寸。`;return;}const n=P.state.placements.length,p={id:P.uuid(),componentId:id,x:4+(n%8)*18,y:4+Math.floor(n/8)*18,width:P.component(id).icWidth,height:P.component(id).icHeight,rotation:0,side:activeSide()};clamp(p);const position=P.boardRules.findSpace(p);if(!position)return reject('此面沒有足以容納 IC 且符合 Keep Out 的位置。');P.state.placements.push(position);$('placement-rule-warning').textContent='';selected=id;changed();}
+  function place(id){if(find(id)||!P.component(id))return;const c=P.component(id);if(c.icWidth>P.state.board.width||c.icHeight>P.state.board.height){$('placement-message').textContent=`${c.name} 的 IC 尺寸超出電路板，請增加板尺寸。`;return;}const n=P.state.placements.length,p={id:P.uuid(),componentId:id,x:4+(n%8)*18,y:4+Math.floor(n/8)*18,width:P.component(id).icWidth,height:P.component(id).icHeight,rotation:0,side:activeSide()};clamp(p);const position=P.boardRules.findSpace(p);if(!position)return reject('此面沒有足以容納 IC 且符合 Keep Out 的位置。');P.state.placements.push(position);$('placement-rule-warning').textContent='';selected=id;if(P.isEdgeMount(c))snapToEdge(position);changed();}
   function showPlacement(id){const p=find(id);if(!p)return;selected=id;$('placement-side').value=side(p);$('view-top').click();render();}
   function assignSide(id,face){
     if(!['top','bottom'].includes(face))return;
@@ -29,12 +29,21 @@
     else {const previous=activeSide();$('placement-side').value=face;place(id);if(!find(id))$('placement-side').value=previous;}
     if(find(id))showPlacement(id);
   }
+  // Edge-mount (side-launch) connectors must sit flush with a board edge.
+  // The barrel points out of the edge selected by rotation: 0° top, 90° right, 180° bottom, 270° left.
+  function edgeGap(p){const s=size(p),b=P.state.board;return [p.y,b.width-(p.x+s.w),b.height-(p.y+s.h),p.x][(p.rotation/90)%4];}
+  function snapToEdge(p){const c=P.component(p.componentId),b=P.state.board,s=size(p),W=c.icWidth,L=c.icHeight,cx=p.x+s.w/2,cy=p.y+s.h/2;
+    const options=[{rotation:0,x:cx-W/2,y:0,d:cy},{rotation:90,x:b.width-L,y:cy-W/2,d:b.width-cx},{rotation:180,x:cx-W/2,y:b.height-L,d:b.height-cy},{rotation:270,x:0,y:cy-W/2,d:cx}].sort((a,q)=>a.d-q.d);
+    for(const o of options)if(commit(p,{rotation:o.rotation,x:o.x,y:o.y})){$('placement-rule-warning').textContent='';return true;}return reject('最近板邊皆被其他元件或 Keep Out 佔用，請手動調整。');}
+  P.edgeMountIssues=(state=P.state)=>state.placements.filter(p=>P.isEdgeMount(state.components.find(c=>c.id===p.componentId))&&edgeGap(p)>0.05).map(p=>state.components.find(c=>c.id===p.componentId).name);
   function overlaps(a,b){const x=size(a),y=size(b);return a.x<b.x+y.w&&a.x+x.w>b.x&&a.y<b.y+y.h&&a.y+x.h>b.y;}
   function render(){
     const board=P.state.board;for(const key of ['width','height','thickness'])if(!boardDraft.has(key))$('board-'+key).value=board[key];P.pcb3d.render(selected);
     const highest=face=>Math.max(0,...P.state.placements.filter(p=>side(p)===face).map(p=>P.component(p.componentId)?.icThickness||0));
     const top=highest('top'),bottom=highest('bottom');$('height-summary').textContent=`Top 最高 IC：${top} mm · Bottom 最高 IC：${bottom} mm · 整體高度：${Number((board.thickness+top+bottom).toFixed(3))} mm`;
-    svg.setAttribute('viewBox',`-5 -5 ${board.width+10} ${board.height+10}`);
+    // Edge-launch connectors overhang the board: widen the view so their barrels stay visible.
+    margin=Math.max(5,...P.state.placements.map(p=>(P.connectorModel(P.component(p.componentId),board.thickness)?.overhang||0)+2));
+    svg.setAttribute('viewBox',`${-margin} ${-margin} ${board.width+2*margin} ${board.height+2*margin}`);
     for(const id of ['pcb-board','pcb-dots']){ $(id).setAttribute('width',board.width);$(id).setAttribute('height',board.height); }
     const keepouts=$('pcb-keepouts');keepouts.replaceChildren();for(const p of P.state.placements){const c=P.component(p.componentId);for(const z of P.boardRules.zones(p,c).filter(z=>z.side===activeSide())){const r=node('rect',{x:z.x,y:z.y,width:z.w,height:z.h,class:'pcb-keepout '+z.kind,'pointer-events':'none'});r.append(node('title',{},`${c.name} · ${z.kind==='same'?'同面':'背面'} Keep Out`));keepouts.append(r);}}
     const parts=$('pcb-parts'),nets=$('pcb-nets');parts.replaceChildren();nets.replaceChildren();
@@ -44,6 +53,28 @@
     for(const p of P.state.placements){const c=P.component(p.componentId);
       // Screw holes go through the board: show them (not draggable) on the opposite face too.
       if(c&&P.isScrewHole(c)&&side(p)!==activeSide()){const through=node('g',{class:'pcb-hole-through',opacity:.75,'pointer-events':'none'});through.append(...holeMarks(c,p.x+p.width/2,p.y+p.height/2),node('title',{},`${c.name}（貫穿孔，螺絲頭在 ${side(p).toUpperCase()} 面）`));parts.append(through);continue;}
+      const model=c&&P.connectorModel(c,board.thickness);
+      if(model){
+        const mount=side(p),face=activeSide(),t=board.thickness,mz=z=>mount==='bottom'?t-z:z,frame=P.connectorFrame(p,model),s=size(p);
+        const span=part=>{const a=mz(part.type==='pad'?part.z:part.type==='hcyl'?part.zc-part.r:part.z0),b=mz(part.type==='pad'?part.z:part.type==='hcyl'?part.zc+part.r:part.z1);return [Math.min(a,b),Math.max(a,b)];};
+        const visible=model.parts.filter(part=>{const [lo,hi]=span(part);return part.type==='pad'?(face==='top'?hi>=t-1e-9:lo<=1e-9):(face==='top'?hi>t/2:lo<t/2);})
+          .sort((a,b)=>(a.type==='pad'?-1:0)-(b.type==='pad'?-1:0)||(face==='top'?span(a)[1]-span(b)[1]:span(b)[0]-span(a)[0]));
+        if(!visible.length)continue;
+        const own=mount===face,g=node('g',own?{'data-component':c.id,tabindex:0,role:'button','aria-label':`${c.name} · ${p.x}, ${p.y} mm`,class:'pcb-chip pcb-connector'+(selected===c.id?' selected':'')+(collisions.has(c.id)?' collision':'')}:{class:'pcb-connector-through',opacity:.55,'pointer-events':'none'});
+        const inner=node('g',{transform:`translate(${frame.origin.x} ${frame.origin.y}) rotate(${frame.rot})`});
+        for(const part of visible){
+          if(part.type==='pad'||part.type==='box')inner.append(node('rect',{x:part.u0,y:Math.min(part.v0,part.v1),width:part.u1-part.u0,height:Math.abs(part.v1-part.v0),fill:part.color,opacity:part.type==='pad'?.85:1,stroke:part.type==='pad'?'none':'#4a3a12','stroke-width':.05,class:'pcb-connector-'+part.type}));
+          else if(part.type==='hcyl'){const y0=Math.min(part.v0,part.v1),len=Math.abs(part.v1-part.v0);inner.append(node('rect',{x:-part.r,y:y0,width:2*part.r,height:len,fill:part.color,stroke:'#4a3a12','stroke-width':.06,class:'pcb-connector-barrel'}));
+            for(let v=y0+part.thread;v<y0+len-1e-6;v+=part.thread)inner.append(node('line',{x1:-part.r,y1:v,x2:part.r,y2:v,stroke:'#8a6a24','stroke-width':.07}));
+            inner.append(node('rect',{x:-part.r*.45,y:y0,width:part.r*.3,height:len,fill:'#fff',opacity:.28}));}
+          else if(part.type==='vcyl'){inner.append(node('circle',{cx:part.uc,cy:part.vc,r:part.r,fill:part.color,stroke:'#59616a','stroke-width':.05,class:'pcb-connector-shell'}),node('circle',{cx:part.uc,cy:part.vc,r:part.inner,fill:'#2b3138'}),node('circle',{cx:part.uc,cy:part.vc,r:part.pin,fill:'#f0cf73'}));}
+        }
+        g.append(inner);
+        if(own){if(selected===c.id)g.append(node('rect',{x:p.x,y:p.y,width:s.w,height:s.h,fill:'none',stroke:'#ffffff','stroke-width':.2,'stroke-dasharray':'.6 .4'}));
+          g.append(node('text',{x:p.x+s.w/2,y:p.rotation===180?p.y-.8:p.y+s.h+1.5,'text-anchor':'middle','font-size':1.2,fill:'#eef4fa'},c.name),node('title',{},`${c.name}\n${c.packageSpec||c.type} · 佔位 ${p.width} × ${p.height} mm · ${p.rotation}°${model.origin==='edge'?'\n筒身朝向 '+['上','右','下','左'][(p.rotation/90)%4]+' 側板邊（旋轉可改變方向）':''}`));}
+        else g.append(node('title',{},`${c.name}（${mount.toUpperCase()} 面元件，跨板部分）`));
+        parts.append(g);continue;
+      }
       if(!c||side(p)!==activeSide())continue;const {w,h}=size(p),g=node('g',{'data-component':c.id,transform:`translate(${p.x} ${p.y})`,tabindex:0,role:'button','aria-label':`${c.name} · ${p.x}, ${p.y} mm`,class:'pcb-chip'+(selected===c.id?' selected':'')+(collisions.has(c.id)?' collision':'')});
       const geometry=P.icGeometry(c),body=P.icRect(geometry.body,c,p.rotation);
       if(geometry.hole){g.append(...holeMarks(c,w/2,h/2),node('text',{x:w/2,y:h+1.6,'text-anchor':'middle','font-size':1.2,fill:'#dfe8ef'},`${c.name} · ${P.packageLabel(c)}`),node('title',{},`${c.name}\n${P.packageLabel(c)} · 墊 Ø${c.padDiameter} mm · 螺絲頭高 ${c.icThickness} mm\n貫穿孔：背面相同位置禁佈`));parts.append(g);continue;}
@@ -54,6 +85,7 @@
       g.append(node('circle',{cx:1.3,cy:1.3,r:.45,fill:'#f5d17d'}),node('text',{x:w/2,y:h/2,'text-anchor':'middle','font-size':Math.min(2,w/Math.max(c.name.length*.6,1)),fill:'#eef4fa'},c.name),node('text',{x:w/2,y:h/2+2.5,'text-anchor':'middle','font-size':1.2,fill:'#a1b4c7'},`${p.width} × ${p.height} mm · ${p.rotation}°`),node('title',{},`${c.name}\n${c.partNumber||'虛擬 IC'} · ${c.icPackage==='Custom'?(c.packageSpec||'自訂'):c.icPackage}${['SOT','TQFP'].includes(c.icPackage)?' '+c.icPinCount+' PIN':''}\n${P.componentPorts(c.id).length} 個介面 Port（非實體腳位）`));parts.append(g);
     }
     $('placement-message').textContent=`PCB ${board.width} × ${board.height} mm · 面積 ${board.width*board.height} mm² · ${activeSide()==='top'?'Top 上表面':'Bottom 下表面'}（共用 Top 視角 XY 座標） · 已擺放 ${P.state.placements.length} / ${P.state.components.length} 顆 IC · ${collisions.size?collisions.size+' 顆元件重疊，請調整位置':'無元件重疊'} · 左上角為原點。虛擬尺寸供規劃使用。`;
+    {const edge=P.edgeMountIssues();if(edge.length)$('placement-message').textContent+=` · ⚠ 側插接頭未貼齊板邊：${edge.join('、')}（選取後按「貼齊最近板邊」）`;}
     const inventory=$('inventory');inventory.replaceChildren();
     const table=document.createElement('table'),head=document.createElement('thead'),header=document.createElement('tr');
     for(const label of ['頁面 1 元件','封裝 / 尺寸 (mm)','目前狀態','選擇擺放面']){const th=document.createElement('th');th.scope='col';th.textContent=label;header.append(th);}head.append(header);table.append(head);
@@ -80,9 +112,10 @@
     for(const [value,label] of [['top','Top 上表面'],['bottom','Bottom 下表面']]){const option=document.createElement('option');option.value=value;option.textContent=label;face.append(option);}face.value=side(p);
     face.onchange=()=>{const value=face.value;if(commit(p,{side:value})){$('placement-side').value=value;render();}else face.value=side(p);};faceLabel.append(face);editor.append(faceLabel);
     for(const [key,label] of [['x','X mm'],['y','Y mm'],['width','IC 長 mm'],['height','IC 寬 mm'],['icThickness','IC 高 mm']]){const l=document.createElement('label'),input=document.createElement('input');l.textContent=label;input.type='number';input.step='.1';input.min=key==='width'||key==='height'?1:0;input.value=key==='icThickness'?P.component(p.componentId).icThickness:p[key];if(['width','height','icThickness'].includes(key)){input.readOnly=true;input.title='請在 Architecture 元件屬性修改 IC 尺寸';}input.onchange=()=>{if(['width','height','icThickness'].includes(key))return;const value=Number(input.value),next={...p,[key]:value};const {w,h}=size(next);if(!Number.isFinite(value)||value<Number(input.min)||w>board.width||h>board.height){render();return;}commit(p,next);};l.append(input);editor.append(l);}
+    if(P.isEdgeMount(P.component(p.componentId))){const b=document.createElement('button');b.textContent='貼齊最近板邊';b.id='snap-edge';b.onclick=()=>snapToEdge(p);editor.append(b);}
     for(const [label,action] of [['旋轉 90°',()=>{const next={...p,rotation:(p.rotation+90)%360},s=size(next);if(s.w>board.width||s.h>board.height)return;commit(p,next);}],['取消擺放',()=>cancelPlacement(p.componentId)]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;editor.append(b);}
   }
-  function point(e){const r=svg.getBoundingClientRect(),b=P.state.board,scale=Math.min(r.width/(b.width+10),r.height/(b.height+10));return {x:(e.clientX-r.left-(r.width-(b.width+10)*scale)/2)/scale-5,y:(e.clientY-r.top-(r.height-(b.height+10)*scale)/2)/scale-5};}
+  function point(e){const r=svg.getBoundingClientRect(),b=P.state.board,M=2*margin,scale=Math.min(r.width/(b.width+M),r.height/(b.height+M));return {x:(e.clientX-r.left-(r.width-(b.width+M)*scale)/2)/scale-margin,y:(e.clientY-r.top-(r.height-(b.height+M)*scale)/2)/scale-margin};}
   svg.addEventListener('pointerdown',e=>{if(e.button!==0)return;const g=e.target.closest('[data-component]');selected=g?.dataset.component||null;const p=find(selected);if(p){e.preventDefault();drag={p,start:point(e),x:p.x,y:p.y};svg.setPointerCapture?.(e.pointerId);}render();});
   svg.addEventListener('pointermove',e=>{if(!drag)return;const q=point(e),snap=n=>$('placement-snap').checked?Math.round(n):Math.round(n*10)/10;commit(drag.p,{x:snap(drag.x+q.x-drag.start.x),y:snap(drag.y+q.y-drag.start.y)});});
   for(const event of ['pointerup','pointercancel','lostpointercapture'])svg.addEventListener(event,()=>drag=null);
